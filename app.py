@@ -954,6 +954,45 @@ def jwt_banco(role: str, dias: int = 3650) -> str:
     return (h + b"." + p + b"." + s).decode()
 
 
+@st.dialog("✏️ Editar perfil de backup", width="large")
+def dialog_editar_backup(job_id: str) -> None:
+    BK_CFG_D = Path.home() / ".vps_backup.json"
+    try:
+        cfg_d = json.loads(BK_CFG_D.read_text())
+    except Exception:
+        cfg_d = {"jobs": []}
+    jobs_d = cfg_d.get("jobs", [])
+    job = next((j for j in jobs_d if j.get("id") == job_id), None)
+    if not job:
+        st.error("Perfil não encontrado.")
+        return
+    DIAS_D = {1: "seg", 2: "ter", 3: "qua", 4: "qui", 5: "sex",
+              6: "sáb", 7: "dom"}
+    nome_e = st.text_input("Nome", value=job.get("nome", ""))
+    ce1, ce2 = st.columns(2)
+    hora_e = ce1.selectbox("Hora (xx:30)", [f"{h:02d}" for h in range(24)],
+                           index=int(job.get("hora", "03")))
+    ret_e = ce2.number_input("Guardar por (dias)", 1, 365,
+                             int(job.get("manter_dias", 7)))
+    dias_e = st.multiselect("Dias da semana", list(DIAS_D.values()),
+                            default=[DIAS_D[d] for d in job.get("dias", [])
+                                     if d in DIAS_D])
+    dest_e = st.text_input("Destino (pasta local ou remote rclone)",
+                           value=job.get("destino", ""))
+    if st.button("💾 Salvar alterações", type="primary",
+                 use_container_width=True):
+        job.update({
+            "nome": nome_e.strip() or job.get("nome", ""),
+            "hora": hora_e,
+            "manter_dias": int(ret_e),
+            "dias": [k for k, v in DIAS_D.items() if v in dias_e]
+                    or job.get("dias", [1, 2, 3, 4, 5, 6, 7]),
+            "destino": dest_e.strip() or job.get("destino", "")})
+        BK_CFG_D.write_text(json.dumps({"jobs": jobs_d},
+                                       ensure_ascii=False, indent=1))
+        st.rerun()
+
+
 @st.dialog("🧰 Console SQL — Postgres local", width="large")
 def dialog_console_sql() -> None:
     st.caption("Leitura liberada; escrita/DDL só com a chave 🔓 (cuidado: produção).")
@@ -2493,8 +2532,8 @@ elif pagina == "🐘 Supabase VPS":
             _est_bk = {}
         for _j in list(_jobs):
             with st.container(border=True):
-                cj1, cj2, cj3, cj4 = st.columns([3.6, 0.8, 1.0, 0.4],
-                                                vertical_alignment="center")
+                cj1, cj2, cj3, cj5, cj4 = st.columns(
+                    [3.4, 0.8, 1.0, 0.5, 0.4], vertical_alignment="center")
                 _dias_txt = ("todos os dias" if len(_j.get("dias", [])) == 7
                              else "/".join(_DIAS_LBL[d]
                                            for d in _j.get("dias", [])))
@@ -2521,12 +2560,26 @@ elif pagina == "🐘 Supabase VPS":
                              "force", _j.get("id", "")], timeout=600)
                     (st.success if _rc_j2 == 0 else st.error)(
                         (_out_j2 or "")[-400:] or "ok")
+                if cj5.button("✏️", key=f"bked_{_j.get('id')}",
+                              help="Editar agenda, destino e retenção."):
+                    dialog_editar_backup(_j.get("id", ""))
                 if cj4.button("✕", key=f"bkdel_{_j.get('id')}",
                               help="Remove o perfil (não apaga os arquivos "
                                    "já gerados)."):
                     _jobs.remove(_j)
                     _salvar_jobs()
                     st.rerun()
+
+        with st.expander("🧾 Log das execuções (timer + manuais)"):
+            _rc_lg, _out_lg = _run(["journalctl", "-u", "vpsbackup", "-n", "60",
+                                    "--no-pager", "-o", "short-iso"], timeout=8)
+            st.code(((_out_lg or "").strip()
+                     or "sem registros ainda — instale/ative o timer vpsbackup "
+                        "(kit no handoff)")[-4000:], language="text")
+            st.caption("O timer dispara TODA hora (xx:30); cada perfil executa "
+                       "só no horário dele. \"nenhum perfil no horário\" = "
+                       "ronda vazia, normal. Execuções manuais (▶ Agora) não "
+                       "passam pelo timer e aparecem só no 🧾 do card.")
 
         _locais = [Path(str(_j.get("destino", ""))) for _j in _jobs
                    if str(_j.get("destino", "")).startswith("/")]
