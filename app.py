@@ -1524,8 +1524,9 @@ elif pagina == "🌿 Git & Deploys":
     st.markdown("<style>button[data-baseweb='tab'] p"
                 "{font-size:1.0rem;font-weight:600;}"
                 "button[data-baseweb='tab']"
-                "{padding:0.4rem 1rem;justify-content:center;text-align:center;"
-                "border-radius:8px 8px 0 0;margin-right:2px;}"
+                "{padding:0.7rem 1.6rem;min-height:2.8rem;"
+                "justify-content:center;text-align:center;"
+                "border-radius:10px 10px 0 0;margin-right:4px;}"
                 "button[data-baseweb='tab']:hover{background:#f3f4f6;}"
                 "button[data-baseweb='tab'][aria-selected='true']"
                 "{background:#fef2f2;}</style>",
