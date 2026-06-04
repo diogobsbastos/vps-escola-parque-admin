@@ -23,6 +23,19 @@ from pathlib import Path
 HOME = Path.home()
 CFG = HOME / ".vps_backup.json"
 EST = HOME / ".vps_backup_estado.json"
+LOGF = HOME / ".vps_backup_log.jsonl"
+
+
+def log_evento(job_nome: str, resultado: str, modo: str) -> None:
+    try:
+        linhas = (LOGF.read_text().splitlines()[-499:]
+                  if LOGF.exists() else [])
+    except Exception:
+        linhas = []
+    linhas.append(json.dumps(
+        {"quando": time.strftime("%Y-%m-%d %H:%M"), "job": job_nome,
+         "resultado": resultado, "modo": modo}, ensure_ascii=False))
+    LOGF.write_text("\n".join(linhas) + "\n")
 SEGREDOS = [".innova_db.json", ".postgrest_jwt_secret", "postgrest.conf",
             ".vps_webhook_secret", ".vps_webhook_rota", ".vps_config.json",
             ".vps_git_projetos.json", ".vps_git_state.json",
@@ -127,11 +140,16 @@ def main() -> None:
         estado[job.get("id", "?")] = {
             "quando": time.strftime("%Y-%m-%d %H:%M"),
             "resultado": ("✅ " if ok else "❌ ") + res + " · " + ", ".join(msgs)}
+        log_evento(job.get("nome", job.get("id", "?")),
+                   estado[job.get("id", "?")]["resultado"],
+                   "manual" if force else "timer")
         print(f"{job.get('nome', job.get('id'))}: "
               f"{estado[job.get('id', '?')]['resultado']}")
 
     EST.write_text(json.dumps(estado, ensure_ascii=False, indent=1))
     if not rodou:
+        if not force:
+            log_evento("—", "💤 ronda vazia (nenhum perfil no horário)", "timer")
         print("nenhum perfil no horário (ou todos desligados)")
 
 

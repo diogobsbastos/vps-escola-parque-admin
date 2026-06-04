@@ -2713,24 +2713,32 @@ elif pagina == "🐘 Supabase VPS":
                 except Exception:
                     return iso
 
-            if _fontes[_f_lg] == "vpsbackup" and _txt_lg:
-                _blocos, _atual = [], []
-                for _ln in _txt_lg.splitlines():
-                    if "Starting VPS Backup" in _ln and _atual:
-                        _blocos.append(_atual)
-                        _atual = []
-                    _atual.append(_ln)
-                if _atual:
-                    _blocos.append(_atual)
-                for _b in reversed(_blocos[-30:]):
-                    _quando = _data_br(_b[0].split()[0]) if _b else "?"
-                    _resumo = next(
-                        (l.split("]: ", 1)[-1] for l in _b if "python3[" in l),
-                        "(sem saída do script)")
-                    _icone = ("✅" if "✅" in _resumo else
-                              "❌" if "❌" in _resumo else "💤")
-                    with st.expander(f"{_icone} {_quando} — {_resumo[:100]}"):
-                        st.code("\n".join(_b), language="text")
+            if _fontes[_f_lg] == "vpsbackup":
+                _logf = Path.home() / ".vps_backup_log.jsonl"
+                _evts = []
+                try:
+                    _evts = [json.loads(l) for l in
+                             _logf.read_text().splitlines() if l.strip()]
+                except Exception:
+                    pass
+                if not _evts:
+                    st.info("Nenhuma execução registrada ainda — rode um "
+                            "▶ Agora ou espere a ronda do timer (xx:30).")
+                for _e in reversed(_evts[-int(_n_lg):]):
+                    _res_e = _e.get("resultado", "")
+                    _icone = ("✅" if _res_e.startswith("✅") else
+                              "❌" if _res_e.startswith("❌") else "💤")
+                    _q_e = _e.get("quando", "?")
+                    try:
+                        _d_e, _h_e = _q_e.split(" ")
+                        _a_e, _m_e, _dd_e = _d_e.split("-")
+                        _q_e = f"{_dd_e}/{_m_e}/{_a_e} {_h_e}"
+                    except Exception:
+                        pass
+                    with st.expander(
+                            f"{_icone} {_q_e} · {_e.get('job', '?')} "
+                            f"({_e.get('modo', '?')}) — {_res_e[:80]}"):
+                        st.code(_res_e or "(sem detalhes)", language="text")
             else:
                 with st.container(height=420):
                     st.code((_txt_lg or "sem registros ainda")[-12000:],
