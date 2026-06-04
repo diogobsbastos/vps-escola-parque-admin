@@ -1076,13 +1076,17 @@ if pagina == "📊 Dashboard":
         disco = psutil.disk_usage("/")
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("CPU", f"{cpu:.0f}%")
-        c2.metric("RAM", f"{mem.percent:.0f}%", f"{mem.used/1e9:.1f} / {mem.total/1e9:.0f} GB")
-        c3.metric("Disco /", f"{disco.percent:.0f}%", f"{disco.used/1e9:.1f} / {disco.total/1e9:.0f} GB")
+        c1.caption(f"{psutil.cpu_count()} vCPUs ARM")
+        c2.metric("RAM", f"{mem.percent:.0f}%")
+        c2.caption(f"{mem.used/1e9:.1f} de {mem.total/1e9:.0f} GB")
+        c3.metric("Disco /", f"{disco.percent:.0f}%")
+        c3.caption(f"{disco.used/1e9:.1f} de {disco.total/1e9:.0f} GB")
         try:
             carga = ", ".join(f"{x:.2f}" for x in psutil.getloadavg())
         except Exception:
             carga = "—"
         c4.metric("Load (1/5/15m)", carga)
+        c4.caption("média de processos na fila")
 
     st.divider()
     st.subheader("🚦 Visão geral dos serviços")
@@ -2264,10 +2268,11 @@ curl -s -o /dev/null -w "%{{http_code}}\\n" https://{_nd}/admin/""",
         mem = psutil.virtual_memory()
         r1, r2, r3, r4 = st.columns(4)
         r1.metric("CPU", f"{cpu:.0f}%"); r1.progress(min(cpu/100, 1.0))
-        r2.metric("RAM", f"{mem.percent:.0f}%", f"{mem.used/1e9:.1f}/{mem.total/1e9:.0f} GB")
-        r2.progress(min(mem.percent/100, 1.0))
-        r3.metric("Disco", f"{disco.percent:.0f}%", f"{disco.used/1e9:.1f}/{disco.total/1e9:.0f} GB")
-        r3.progress(min(disco.percent/100, 1.0))
+        r1.caption(f"{psutil.cpu_count()} vCPUs ARM")
+        r2.metric("RAM", f"{mem.percent:.0f}%"); r2.progress(min(mem.percent/100, 1.0))
+        r2.caption(f"{mem.used/1e9:.1f} de {mem.total/1e9:.0f} GB")
+        r3.metric("Disco", f"{disco.percent:.0f}%"); r3.progress(min(disco.percent/100, 1.0))
+        r3.caption(f"{disco.used/1e9:.1f} de {disco.total/1e9:.0f} GB")
         try:
             carga = ", ".join(f"{x:.2f}" for x in psutil.getloadavg())
         except Exception:
