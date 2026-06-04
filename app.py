@@ -1756,33 +1756,33 @@ elif pagina == "🚀 Deploys":
         "(webhook/ronda/manual) e se deu certo."
     )
 
-    @st.fragment(run_every=3)
+    @st.fragment(run_every=4)
     def _deploys_live():
         seg = autodeploy_proximo()
         if seg == -1:
             st.markdown("#### 🔨 Deploy em andamento AGORA")
             st.progress(1.0, text="vigia aplicando (pull → build → restart) — "
-                                  "acompanhe o log abaixo")
+                                  "log ao vivo abaixo")
             _rc_j, _out_j = _run(["journalctl", "-u", "vpsautodeploy", "-n", "16",
                                   "--no-pager", "-o", "cat"], timeout=5)
             if _rc_j == 0 and _out_j:
                 st.code(_out_j[-1800:], language="text")
+        else:
+            _hook = webhook_ativo()
+            _ult = webhook_ultimo_push()
+            with st.container(border=True):
+                _c1, _c2, _c3 = st.columns([1.6, 2.9, 1.5],
+                                           vertical_alignment="center")
+                _c1.markdown("⚡ **Webhook** "
+                             + ("🟢 ativo" if _hook else "🔴 fora do ar"))
+                _c2.markdown(("📨 último push: " + _ult) if _ult
+                             else "📨 nenhum push recebido ainda")
+                _c3.markdown("💤 esteira livre")
+        hist = git_hist_ler()
+        if not hist:
+            st.info("Nenhum deploy registrado ainda — faça um push que ele "
+                    "aparece aqui sozinho.")
             return
-        _hook = webhook_ativo()
-        _ult = webhook_ultimo_push()
-        with st.container(border=True):
-            _c1, _c2, _c3 = st.columns([1.6, 2.9, 1.5],
-                                       vertical_alignment="center")
-            _c1.markdown("⚡ **Webhook** " + ("🟢 ativo" if _hook else "🔴 fora do ar"))
-            _c2.markdown(("📨 último push: " + _ult) if _ult
-                         else "📨 nenhum push recebido ainda")
-            _c3.markdown("💤 esteira livre")
-    _deploys_live()
-
-    hist = git_hist_ler()
-    if not hist:
-        st.info("Nenhum deploy registrado ainda — faça um push que ele aparece aqui.")
-    else:
         _repos_h = sorted({e.get("repo", "?") for e in hist})
         _f_h = st.selectbox("Projeto", ["📁 todos os projetos"] + _repos_h,
                             key="dep_filtro")
@@ -1797,7 +1797,9 @@ elif pagina == "🚀 Deploys":
         st.dataframe(_dados_h, use_container_width=True, height=420,
                      hide_index=True)
         st.caption(f"{len(hist)} registros (guarda os 100 últimos) · "
-                   "✅ foi pro ar · ❌ falhou (produção segue na versão anterior)")
+                   "✅ foi pro ar · ❌ falhou (produção segue na versão anterior) · "
+                   "🔄 página viva: atualiza sozinha a cada 4s")
+    _deploys_live()
 
     with st.expander("🧾 Log bruto do vigia (últimas 60 linhas)"):
         _rc_j, _out_j = _run(["journalctl", "-u", "vpsautodeploy", "-n", "60",
