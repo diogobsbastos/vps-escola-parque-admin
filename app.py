@@ -1037,6 +1037,8 @@ def dialog_exportar() -> None:
 
     _td = "padding:6px 8px;border-bottom:1px solid #e5e7eb;"
     _sep = "border-left:1px solid #d1d5db;"
+    _az = "background:#eff6ff;"   # par Banco (azul clarinho)
+    _am = "background:#fefce8;"   # par Segredos (amarelo clarinho)
     linhas_html = []
     for k in chaves[(int(pag) - 1) * POR_PAG: int(pag) * POR_PAG]:
         itens = grupos[k]
@@ -1061,21 +1063,21 @@ def dialog_exportar() -> None:
                 lk_c = _link_dl(_c)
             linhas_html.append(
                 f"<tr>"
-                f"<td style='{_td}white-space:nowrap'>{cel_data}</td>"
-                f"<td style='{_td}{_sep}padding-left:12px'>{cel_d}</td>"
-                f"<td style='{_td}text-align:center'>{lk_d}</td>"
-                f"<td style='{_td}{_sep}padding-left:12px'>{cel_c}</td>"
-                f"<td style='{_td}text-align:center'>{lk_c}</td>"
+                f"<td style='{_td}white-space:nowrap;width:130px'>{cel_data}</td>"
+                f"<td style='{_td}{_sep}{_az}padding-left:12px;width:34%'>{cel_d}</td>"
+                f"<td style='{_td}{_az}text-align:center;width:64px'>{lk_d}</td>"
+                f"<td style='{_td}{_sep}{_am}padding-left:12px;width:34%'>{cel_c}</td>"
+                f"<td style='{_td}{_am}text-align:center;width:64px'>{lk_c}</td>"
                 f"</tr>")
     _th = ("padding:6px 8px;text-align:left;font-size:0.85em;color:#6b7280;"
            "border-bottom:2px solid #d1d5db;")
     st.markdown(
         "<table style='width:100%;border-collapse:collapse;font-size:0.92em'>"
-        f"<tr><th style='{_th}'>Data</th>"
-        f"<th style='{_th}{_sep}padding-left:12px'>Banco</th>"
-        f"<th style='{_th}text-align:center'>Baixar</th>"
-        f"<th style='{_th}{_sep}padding-left:12px'>Segredos</th>"
-        f"<th style='{_th}text-align:center'>Baixar</th></tr>"
+        f"<tr><th style='{_th}width:130px'>Data</th>"
+        f"<th style='{_th}{_sep}{_az}padding-left:12px;width:34%'>Banco</th>"
+        f"<th style='{_th}{_az}text-align:center;width:64px'>Baixar</th>"
+        f"<th style='{_th}{_sep}{_am}padding-left:12px;width:34%'>Segredos</th>"
+        f"<th style='{_th}{_am}text-align:center;width:64px'>Baixar</th></tr>"
         + "".join(linhas_html) + "</table>",
         unsafe_allow_html=True)
 
