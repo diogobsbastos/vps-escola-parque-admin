@@ -28,10 +28,12 @@ PASTAS_OK = [
     Path("/home/ubuntu/vps-admin"),
     Path("/home/ubuntu/llm-gateway"),
     Path("/home/ubuntu/sertanejo-lab"),
+    Path("/home/ubuntu/innova-front"),
 ]
 SERVICOS_OK = {
     "escolaparque", "escolaparque-worker", "vpsadmin",
     "nginx", "ollama", "llmgateway", "sertanejolab", "vpsmcp",
+    "innovafront",
 }
 ACOES_OK = {"restart", "stop", "start", "status"}
 
