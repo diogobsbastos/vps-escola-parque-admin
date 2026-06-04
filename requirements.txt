@@ -1,0 +1,4 @@
+streamlit
+psutil
+requests
+streamlit-cookies-controller
