@@ -1,8 +1,8 @@
 [Unit]
-Description=Backup noturno do banco interno (03:30)
+Description=VPS Backup inteligente (script decide pela config; roda toda hora)
 
 [Timer]
-OnCalendar=*-*-* 03:30:00
+OnCalendar=*-*-* *:30:00
 Persistent=true
 
 [Install]

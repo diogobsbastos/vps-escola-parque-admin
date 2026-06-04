@@ -2319,35 +2319,80 @@ elif pagina == "🐘 Supabase VPS":
                     st.session_state["bd_aberto"] = b["banco"]
                     st.rerun()
 
-        with st.expander("💾 Backups — noturno 03:30 + manual (GFS: 7 diários, "
-                         "4 semanais, 6 mensais)"):
+        with st.expander("💾 Backups — sistema inteligente (GFS 7/4/6 + envio externo)"):
+            BK_CFG = Path.home() / ".vps_backup.json"
+            try:
+                _bcfg = json.loads(BK_CFG.read_text())
+            except Exception:
+                _bcfg = {}
+            _c1, _c2, _c3 = st.columns([1.2, 1.6, 2.2],
+                                       vertical_alignment="center")
+            _b_on = _c1.toggle("🟢 Ativo", value=bool(_bcfg.get("ativo", True)),
+                               help="Desligado = o timer continua rodando mas "
+                                    "não faz nada.")
+            _freqs = {"1x por dia (03:30)": "diario", "2x por dia": "12h",
+                      "4x por dia": "6h", "Toda hora": "1h"}
+            _freq_atual = _bcfg.get("frequencia", "diario")
+            _freq_lbl = _c2.selectbox(
+                "Frequência", list(_freqs.keys()),
+                index=list(_freqs.values()).index(_freq_atual)
+                if _freq_atual in _freqs.values() else 0)
+            _dest = _c3.text_input(
+                "Destino externo (rclone — opcional)",
+                value=_bcfg.get("destino", ""),
+                placeholder="ex.: gdrive:BackupsVPS",
+                help="Configure uma vez no SSH: rclone config (suporta Google "
+                     "Drive, OneDrive, S3...). Vazio = só local.")
+            if st.button("💾 Salvar configuração do backup"):
+                try:
+                    BK_CFG.write_text(json.dumps(
+                        {"ativo": _b_on, "frequencia": _freqs[_freq_lbl],
+                         "destino": _dest.strip()}, ensure_ascii=False))
+                    st.success("Config salva — vale a partir da próxima ronda "
+                               "do timer.")
+                except Exception as e:
+                    st.error(f"falha ao salvar: {e}")
+            try:
+                _last = json.loads((Path.home() / ".vps_backup_last.json"
+                                    ).read_text())
+                st.caption(f"🕐 última execução: {_last.get('quando', '?')} · "
+                           f"{_last.get('externo', '')}")
+            except Exception:
+                pass
             _bdir = Path("/home/ubuntu/backups_pg/diario")
             _arqs = (sorted(_bdir.glob("*"), key=lambda p: p.stat().st_mtime,
                             reverse=True) if _bdir.exists() else [])
             if _arqs:
                 _idade_h = (time.time() - _arqs[0].stat().st_mtime) / 3600
                 st.markdown(("🟢" if _idade_h < 26 else "🔴 ATENÇÃO")
-                            + f" último backup há **{_idade_h:.1f}h**")
+                            + f" backup mais recente há **{_idade_h:.1f}h**")
                 st.dataframe(
                     [{"arquivo": a.name,
                       "tamanho": f"{a.stat().st_size / 1024:.0f} KB",
                       "quando": time.strftime("%Y-%m-%d %H:%M",
                                               time.localtime(a.stat().st_mtime))}
-                     for a in _arqs[:15]],
-                    use_container_width=True, hide_index=True, height=240)
+                     for a in _arqs[:12]],
+                    use_container_width=True, hide_index=True, height=220)
+                _dump_opts = [a.name for a in _arqs if a.name.endswith(".sql.gz")]
+                if _dump_opts:
+                    _esc = st.selectbox("⬇ Exportar dump", _dump_opts)
+                    _arq_esc = _bdir / _esc
+                    st.download_button(f"⬇ Baixar {_esc}",
+                                       data=_arq_esc.read_bytes(),
+                                       file_name=_esc, mime="application/gzip")
             else:
-                st.info("Nenhum backup ainda — instale o timer (kit no handoff) "
-                        "ou clique abaixo pro primeiro.")
-            if st.button("💾 Backup agora", type="primary"):
+                st.info("Nenhum backup ainda — instale o timer (kit) ou clique "
+                        "abaixo pro primeiro.")
+            if st.button("▶ Backup AGORA", type="primary"):
                 with st.spinner("Gerando backup de todos os bancos..."):
                     _rc_bk, _out_bk = _run(
-                        ["bash", "/home/ubuntu/vps-admin/backup_pg.sh"],
+                        ["bash", "/home/ubuntu/vps-admin/backup_pg.sh", "force"],
                         timeout=300)
                 (st.success if _rc_bk == 0 else st.error)(
                     (_out_bk or "")[-500:] or "ok")
-            st.caption("Restaurar: `gunzip -c ARQUIVO.sql.gz | sudo -u postgres "
-                       "psql -d BANCO` · configs no `configs_DATA.tgz` · "
-                       "⚠️ offsite (fora do servidor) ainda pendente — na lista.")
+            st.caption("Restaurar: `gunzip -c ARQ.sql.gz | sudo -u postgres psql "
+                       "-d BANCO` · segredos no `configs_*.tgz` · GFS: 7 diários, "
+                       "4 semanais, 6 mensais.")
     else:
         # ---- DRILL-DOWN: dentro do banco ----
         if st.button("← Voltar aos bancos"):
