@@ -1102,6 +1102,7 @@ with st.sidebar:
         "🚀 Aplicativos",
         "🌐 Domínios & Rotas",
         "🌿 Git & Deploys",
+        "🚀 Deploys",
         "🦙 Ollama (IA local)",
         "🔑 API da LLM",
         "🔌 Acesso MCP (Claude)",
@@ -1736,27 +1737,72 @@ elif pagina == "🌿 Git & Deploys":
                         _extras_git.pop(repo, None)
                         salvar_git_projetos(_extras_git)
                         st.rerun()
-    hist = git_hist_ler()
-    if hist:
-        with st.expander(f"📜 Histórico de deploys ({len(hist)} — guarda os 100 últimos)"):
-            _repos_h = sorted({e.get("repo", "?") for e in hist})
-            _f_h = st.selectbox("Filtrar por projeto", ["📁 todos os projetos"] + _repos_h,
-                                key="hist_filtro", label_visibility="collapsed")
-            _dados_h = [
-                {"quando": e.get("quando", "?"), "projeto": e.get("repo", "?"),
-                 "commit": e.get("commit", "?"),
-                 "status": e.get("status", "✅ ok"),
-                 "origem": e.get("origem", "?")}
-                for e in reversed(hist)
-                if _f_h == "📁 todos os projetos" or e.get("repo") == _f_h
-            ]
-            st.dataframe(_dados_h, use_container_width=True, height=230,
-                         hide_index=True)
     st.divider()
     st.caption(
         "⚡ Fluxo da casa: commit → GitHub toca a campainha (webhook) → vigia aplica "
         "em ~5s. A ronda de 2 min é rede de segurança. O Claude opera esta ponte via MCP."
     )
+
+
+# ============================================================
+# PAGINA: Deploys (linha do tempo estilo Vercel)
+# ============================================================
+
+elif pagina == "🚀 Deploys":
+    st.title("🚀 Deploys")
+    st.caption(
+        "O **Git** (página 🌿) cuida do código; **aqui você acompanha o que foi "
+        "PRO AR** — como no painel do Vercel: o que subiu, quando, por onde "
+        "(webhook/ronda/manual) e se deu certo."
+    )
+
+    @st.fragment(run_every=3)
+    def _deploys_live():
+        seg = autodeploy_proximo()
+        if seg == -1:
+            st.markdown("#### 🔨 Deploy em andamento AGORA")
+            st.progress(1.0, text="vigia aplicando (pull → build → restart) — "
+                                  "acompanhe o log abaixo")
+            _rc_j, _out_j = _run(["journalctl", "-u", "vpsautodeploy", "-n", "16",
+                                  "--no-pager", "-o", "cat"], timeout=5)
+            if _rc_j == 0 and _out_j:
+                st.code(_out_j[-1800:], language="text")
+            return
+        _hook = webhook_ativo()
+        _ult = webhook_ultimo_push()
+        with st.container(border=True):
+            _c1, _c2, _c3 = st.columns([1.6, 2.9, 1.5],
+                                       vertical_alignment="center")
+            _c1.markdown("⚡ **Webhook** " + ("🟢 ativo" if _hook else "🔴 fora do ar"))
+            _c2.markdown(("📨 último push: " + _ult) if _ult
+                         else "📨 nenhum push recebido ainda")
+            _c3.markdown("💤 esteira livre")
+    _deploys_live()
+
+    hist = git_hist_ler()
+    if not hist:
+        st.info("Nenhum deploy registrado ainda — faça um push que ele aparece aqui.")
+    else:
+        _repos_h = sorted({e.get("repo", "?") for e in hist})
+        _f_h = st.selectbox("Projeto", ["📁 todos os projetos"] + _repos_h,
+                            key="dep_filtro")
+        _dados_h = [
+            {"quando": e.get("quando", "?"), "projeto": e.get("repo", "?"),
+             "commit": e.get("commit", "?"),
+             "status": e.get("status", "✅ ok"),
+             "origem": e.get("origem", "?")}
+            for e in reversed(hist)
+            if _f_h == "📁 todos os projetos" or e.get("repo") == _f_h
+        ]
+        st.dataframe(_dados_h, use_container_width=True, height=420,
+                     hide_index=True)
+        st.caption(f"{len(hist)} registros (guarda os 100 últimos) · "
+                   "✅ foi pro ar · ❌ falhou (produção segue na versão anterior)")
+
+    with st.expander("🧾 Log bruto do vigia (últimas 60 linhas)"):
+        _rc_j, _out_j = _run(["journalctl", "-u", "vpsautodeploy", "-n", "60",
+                              "--no-pager", "-o", "short-iso"], timeout=6)
+        st.code((_out_j or "sem acesso ao journal")[-4000:], language="text")
 
 
 # ============================================================
