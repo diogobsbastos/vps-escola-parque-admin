@@ -442,6 +442,81 @@ def mcp_online() -> bool:
         return False
 
 
+# ============================================================
+# Helpers — Git & Deploys (ponte GitHub -> producao)
+# ============================================================
+
+GIT_USER = _cfg.get("github_user", "diogobsbastos")
+GIT_STATE_PATH = Path.home() / ".vps_git_state.json"
+
+# Mapa de cada projeto: o que vem do repo -> onde vive em producao.
+GIT_PROJETOS: dict[str, dict] = {
+    "vps-escola-parque-admin": {
+        "rotulo": "🛠️ VPS Admin (painel + LLM Gateway + MCP)",
+        "mapa": {
+            "app.py": "/home/ubuntu/vps-admin/app.py",
+            "requirements.txt": "/home/ubuntu/vps-admin/requirements.txt",
+            "llm_gateway/": "/home/ubuntu/llm-gateway/",
+            "vps_mcp/": "/home/ubuntu/vps-mcp/",
+        },
+        # vpsadmin por ULTIMO: reinicia o proprio painel
+        "servicos": ["llmgateway", "vpsmcp", "vpsadmin"],
+    },
+}
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def git_remote_head(repo: str) -> str:
+    """Ultimo commit no GitHub (sem clonar). Cache 60s."""
+    rc, out = _run(["env", "GIT_TERMINAL_PROMPT=0", "git", "ls-remote",
+                    f"https://github.com/{GIT_USER}/{repo}.git", "HEAD"], timeout=20)
+    return out.split()[0][:10] if rc == 0 and out and "fatal" not in out else "?"
+
+
+def git_estado() -> dict:
+    try:
+        return json.loads(GIT_STATE_PATH.read_text())
+    except Exception:
+        return {}
+
+
+def git_deploy(repo: str, mapa: dict) -> tuple[bool, str]:
+    """Clona o ultimo commit e espalha nas pastas de producao (sem tocar nos .venv)."""
+    import shutil
+    tmp = f"/tmp/deploy-{repo}"
+    shutil.rmtree(tmp, ignore_errors=True)
+    rc, out = _run(["env", "GIT_TERMINAL_PROMPT=0", "git", "clone", "--depth", "1",
+                    f"https://github.com/{GIT_USER}/{repo}.git", tmp], timeout=180)
+    if rc != 0:
+        return False, "clone falhou: " + out[-300:]
+    _, h = _run(["git", "-C", tmp, "rev-parse", "--short=10", "HEAD"])
+    erros = []
+    for origem, destino in mapa.items():
+        src, dst = Path(tmp) / origem.rstrip("/"), Path(destino)
+        try:
+            if origem.endswith("/"):
+                for item in src.rglob("*"):
+                    if item.is_file() and ".git" not in item.parts:
+                        alvo = dst / item.relative_to(src)
+                        alvo.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(item, alvo)
+            else:
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst)
+        except Exception as e:  # noqa: BLE001
+            erros.append(f"{origem}: {e}")
+    shutil.rmtree(tmp, ignore_errors=True)
+    if erros:
+        return False, " | ".join(erros)[:300]
+    est = git_estado()
+    est[repo] = {"commit": (h or "?").strip(), "quando": time.strftime("%Y-%m-%d %H:%M")}
+    try:
+        GIT_STATE_PATH.write_text(json.dumps(est, indent=2))
+    except Exception:
+        pass
+    return True, (h or "?").strip()
+
+
 def checar_senha(digitada: str) -> bool:
     try:
         real = SENHA_PATH.read_text().strip()
@@ -575,6 +650,7 @@ with st.sidebar:
         "📊 Dashboard",
         "🚀 Aplicativos",
         "🌐 Rotas Nginx",
+        "🌿 Git & Deploys",
         "🦙 Ollama (IA local)",
         "🔑 API da LLM",
         "🔌 Acesso MCP (Claude)",
@@ -839,6 +915,66 @@ elif pagina == "🌐 Rotas Nginx":
     st.caption(
         "Para criar rota nova use a aba ➕ Novo App. Edição manual: "
         "`sudo nano /etc/nginx/sites-available/apps` + `sudo nginx -t` + `sudo systemctl reload nginx`."
+    )
+
+
+# ============================================================
+# PAGINA: Git & Deploys
+# ============================================================
+
+elif pagina == "🌿 Git & Deploys":
+    c_t, c_gh = st.columns([4.4, 1.3], vertical_alignment="center")
+    with c_t:
+        st.title("🌿 Git & Deploys")
+    with c_gh:
+        st.link_button("🐙 GitHub", f"https://github.com/{GIT_USER}?tab=repositories",
+                       use_container_width=True)
+    st.caption(
+        "A ponte oficial da casa: **PC (oficina) → GitHub privado (cartório) → "
+        "Servidor (produção)**. ↻ Atualizar = puxa o último commit, aplica nas "
+        "pastas de produção (sem tocar nos venvs) e reinicia os serviços do projeto. "
+        "Histórico e rollback ficam no GitHub."
+    )
+    estado = git_estado()
+    for repo, conf in GIT_PROJETOS.items():
+        with st.container(border=True):
+            remoto = git_remote_head(repo)
+            info = estado.get(repo, {})
+            local = info.get("commit", "—")
+            if remoto == "?":
+                situ = "🟡 GitHub inacessível (credencial?)"
+            elif local == "—":
+                situ = "⚪ nunca deployado pelo painel"
+            elif remoto == local:
+                situ = "🟢 em dia com o GitHub"
+            else:
+                situ = "🟠 atualização disponível!"
+            c1, c2, c3 = st.columns([3.8, 1.4, 1.3], vertical_alignment="center")
+            c1.markdown(
+                f"**{conf['rotulo']}**  \n"
+                f"`{repo}` · GitHub `{remoto}` · produção `{local}` "
+                f"({info.get('quando', 'nunca')}) · {situ}"
+            )
+            c2.link_button("Ver repo", f"https://github.com/{GIT_USER}/{repo}",
+                           use_container_width=True)
+            if c3.button("↻ Atualizar", key=f"dep_{repo}", type="primary",
+                         use_container_width=True):
+                st.info("⏳ Puxando do GitHub e aplicando... o painel vai PISCAR no fim "
+                        "(reinicia a si mesmo). Dê F5 em ~10s.")
+                ok, msg = git_deploy(repo, conf["mapa"])
+                if ok:
+                    st.success(f"✅ Commit `{msg}` aplicado. Reiniciando: "
+                               + ", ".join(conf["servicos"]))
+                    for s in conf["servicos"]:
+                        acao_servico(s, "restart")
+                        time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("Deploy falhou: " + msg)
+    st.divider()
+    st.caption(
+        "🔜 Próximos a conectar: `escola-parque` e `sertanejo-lab` (entram aqui "
+        "quando os repos receberem o código). O Claude também opera esta ponte via MCP."
     )
 
 
@@ -1470,4 +1606,4 @@ elif pagina == "👤 Conta":
                     except Exception as e:  # noqa: BLE001
                         st.error(f"Falha ao trocar senha: {e}")
 
-st.sidebar.caption("VPS Admin v2.0 · base replicável p/ futuras VPS")
+st.sidebar.caption("VPS Admin v2.1 · base replicável p/ futuras VPS")
