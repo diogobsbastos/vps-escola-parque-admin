@@ -1098,8 +1098,11 @@ def dialog_editar_backup(job_id: str) -> None:
               6: "sáb", 7: "dom"}
     nome_e = st.text_input("Nome", value=job.get("nome", ""))
     ce1, ce2 = st.columns(2)
-    hora_e = ce1.selectbox("Hora (xx:30)", [f"{h:02d}" for h in range(24)],
-                           index=int(job.get("hora", "03")))
+    import datetime as _dtm
+    _hm0 = (job.get("horario")
+            or str(job.get("hora", "03")) + ":30").split(":")
+    hora_e = ce1.time_input("Horário", step=300,
+                            value=_dtm.time(int(_hm0[0]), int(_hm0[1])))
     ret_e = ce2.number_input("Guardar por (dias)", 1, 365,
                              int(job.get("manter_dias", 7)))
     dias_e = st.multiselect("Dias da semana", list(DIAS_D.values()),
@@ -1119,7 +1122,7 @@ def dialog_editar_backup(job_id: str) -> None:
                  use_container_width=True):
         job.update({
             "nome": nome_e.strip() or job.get("nome", ""),
-            "hora": hora_e,
+            "horario": hora_e.strftime("%H:%M"),
             "manter_dias": int(ret_e),
             "dias": [k for k, v in DIAS_D.items() if v in dias_e]
                     or job.get("dias", [1, 2, 3, 4, 5, 6, 7]),
@@ -2664,7 +2667,7 @@ elif pagina == "🐘 Supabase VPS":
                                                 vertical_alignment="center")
         c_bk1.caption(
             "Perfis independentes — agenda, destino e retenção próprios. "
-            "O timer ronda de hora em hora e executa quem estiver no horário."
+            "O relógio confere a cada minuto e executa quem estiver no horário."
         )
         if c_bkd.button("☁️ Drive", use_container_width=True,
                         help="Conectar Google Drive (service account, sem "
@@ -2685,8 +2688,9 @@ elif pagina == "🐘 Supabase VPS":
                     nbk1, nbk2, nbk3 = st.columns([2.4, 1.1, 1.4])
                     _nome_bk = nbk1.text_input("Nome do perfil",
                                                placeholder="☁️ Drive diário")
-                    _hora_bk = nbk2.selectbox(
-                        "Hora (xx:30)", [f"{h:02d}" for h in range(24)], index=3)
+                    import datetime as _dtm
+                    _hora_bk = nbk2.time_input("Horário", step=300,
+                                               value=_dtm.time(3, 30))
                     _ret_bk = nbk3.number_input("Guardar por (dias)", 1, 365, 7)
                     _dias_bk = st.multiselect("Dias da semana",
                                               list(_DIAS_LBL.values()),
@@ -2708,7 +2712,7 @@ elif pagina == "🐘 Supabase VPS":
                         "id": (_re.sub(r"\\W+", "_", _nome_bk.strip().lower())[:28]
                                + "_" + str(int(time.time()))[-4:]),
                         "nome": _nome_bk.strip(), "ativo": True,
-                        "hora": _hora_bk,
+                        "horario": _hora_bk.strftime("%H:%M"),
                         "dias": [k for k, v in _DIAS_LBL.items()
                                  if v in _dias_bk] or [1, 2, 3, 4, 5, 6, 7],
                         "destino": _dest_bk.strip(),
@@ -2735,7 +2739,7 @@ elif pagina == "🐘 Supabase VPS":
                 _ult_j = _est_bk.get(_j.get("id", ""), {})
                 cj1.markdown(
                     f"**{_j.get('nome', _j.get('id', '?'))}**  \n"
-                    f"<small>🕐 {_j.get('hora', '03')}:30 · {_dias_txt} · "
+                    f"<small>🕐 {_j.get('horario') or str(_j.get('hora', '03')) + ':30'} · {_dias_txt} · "
                     f"🗄️ {', '.join(_j.get('bancos')) if _j.get('bancos') else 'todos os bancos'} · "
                     f"📦 retém {_j.get('manter_dias', 7)}d · "
                     f"➡️ `{_j.get('destino', '?')}`  \n"
@@ -2827,9 +2831,8 @@ elif pagina == "🐘 Supabase VPS":
                 with st.container(height=420):
                     st.code((_txt_lg or "sem registros ainda")[-12000:],
                             language="text")
-            st.caption("🔄 atualiza sozinho a cada 6s · 💤 = ronda vazia (o "
-                       "timer passa toda hora e ninguém estava no horário — "
-                       "normal) · clique numa linha pra abrir os detalhes.")
+            st.caption("🔄 atualiza sozinho a cada 6s · cada linha = uma "
+                       "execução (manual ou do relógio).")
         _logs_banco()
 
 

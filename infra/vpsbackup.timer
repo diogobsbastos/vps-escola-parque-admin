@@ -1,8 +1,8 @@
 [Unit]
-Description=VPS Backup inteligente (script decide pela config; roda toda hora)
+Description=VPS Backup (relogio minuto a minuto - perfis decidem)
 
 [Timer]
-OnCalendar=*-*-* *:30:00
+OnCalendar=*-*-* *:*:00
 Persistent=true
 
 [Install]

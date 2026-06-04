@@ -53,7 +53,7 @@ def main() -> None:
     jobs = carregar(CFG, {}).get("jobs", [])
     force = len(sys.argv) > 1 and sys.argv[1] == "force"
     alvo = sys.argv[2] if len(sys.argv) > 2 else ""
-    hora = time.strftime("%H")
+    agora_hm = time.strftime("%H:%M")
     dow = int(time.strftime("%u"))
 
     cred = carregar(HOME / ".innova_db.json", {})
@@ -79,7 +79,9 @@ def main() -> None:
         else:
             if not job.get("ativo"):
                 continue
-            if job.get("hora", "03") != hora or dow not in job.get("dias", []):
+            alvo_hm = (job.get("horario")
+                       or str(job.get("hora", "03")) + ":30")
+            if alvo_hm != agora_hm or dow not in job.get("dias", []):
                 continue
         rodou += 1
         sel = job.get("bancos") or []
@@ -148,8 +150,6 @@ def main() -> None:
 
     EST.write_text(json.dumps(estado, ensure_ascii=False, indent=1))
     if not rodou:
-        if not force:
-            log_evento("—", "💤 ronda vazia (nenhum perfil no horário)", "timer")
         print("nenhum perfil no horário (ou todos desligados)")
 
 
