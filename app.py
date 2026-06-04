@@ -1329,8 +1329,7 @@ elif pagina == "🌿 Git & Deploys":
                     st.divider()
                     st.caption("Remover do painel — o app continua rodando; "
                                "não mexe no GitHub nem nos arquivos.")
-                    if st.button("✕ Remover do painel", key=f"rmconf_{repo}",
-                                 use_container_width=True):
+                    if st.button("✕ Remover do painel", key=f"rmconf_{repo}"):
                         _extras_git.pop(repo, None)
                         salvar_git_projetos(_extras_git)
                         st.rerun()
