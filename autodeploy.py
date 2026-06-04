@@ -1,11 +1,17 @@
 """
-VPS AUTO-DEPLOY — o vigia do nosso "Vercel caseiro"
-====================================================
+VPS AUTO-DEPLOY — o vigia do nosso "Vercel caseiro" (com MODO EDUCADO)
+=======================================================================
 Roda a cada 2 min (systemd timer vpsautodeploy.timer). Para cada projeto com
 "auto": true em ~/.vps_git_projetos.json:
   - compara o HEAD do GitHub com a producao;
   - se diferente: git pull (modo pull) ou clone+espalha (modo mapa);
-  - reinicia os servicos do projeto (sudoers ja permite systemctl restart).
+  - reinicia os servicos do projeto.
+
+MODO EDUCADO: se o servico for o PROPRIO PAINEL (vpsadmin) e houver alguem
+conectado nele (websocket ativo na porta 8500), o restart e ADIADO — os
+arquivos ja ficam aplicados e o restart acontece sozinho quando a aba fechar
+(ou apos 30 min, o que vier primeiro). Os demais servicos reiniciam na hora.
+
 Log: journalctl -u vpsautodeploy
 """
 from __future__ import annotations
@@ -19,6 +25,8 @@ from pathlib import Path
 REG = Path.home() / ".vps_git_projetos.json"
 STATE = Path.home() / ".vps_git_state.json"
 CFG = Path.home() / ".vps_config.json"
+PEND = Path.home() / ".vps_admin_restart_pendente"
+ADIAR_MAX = 1800  # 30 min: limite do adiamento do restart do painel
 
 
 def run(cmd: list[str], t: int = 180) -> tuple[int, str]:
@@ -29,6 +37,27 @@ def run(cmd: list[str], t: int = 180) -> tuple[int, str]:
         return 1, str(e)
 
 
+def admin_em_uso() -> bool:
+    """True se ha navegador conectado no painel (conexao na porta 8500)."""
+    rc, out = run(["ss", "-Htn", "state", "established"], 10)
+    return rc == 0 and ":8500" in out
+
+
+def restart(servico: str) -> None:
+    run(["sudo", "-n", "/usr/bin/systemctl", "restart", servico], 60)
+    time.sleep(1)
+
+
+def reiniciar_servicos(servicos: list[str]) -> None:
+    for s in servicos:
+        if s == "vpsadmin" and admin_em_uso():
+            PEND.write_text(str(time.time()))
+            print("vpsadmin: painel em uso -> restart ADIADO (modo educado)")
+            continue
+        restart(s)
+        print(f"{s}: reiniciado")
+
+
 def main() -> None:
     try:
         user = json.loads(CFG.read_text()).get("github_user", "diogobsbastos")
@@ -37,8 +66,7 @@ def main() -> None:
     try:
         projetos = json.loads(REG.read_text())
     except Exception:
-        print("sem registro de projetos; nada a fazer")
-        return
+        projetos = {}
 
     for repo, conf in projetos.items():
         if not conf.get("auto"):
@@ -65,7 +93,7 @@ def main() -> None:
                 est_l = json.loads(STATE.read_text()).get(repo, {}).get("commit", "")
             except Exception:
                 est_l = ""
-            if remoto.startswith(est_l) and est_l:
+            if est_l and remoto.startswith(est_l):
                 continue
             tmp = f"/tmp/autodeploy-{repo}"
             shutil.rmtree(tmp, ignore_errors=True)
@@ -94,11 +122,24 @@ def main() -> None:
         est[repo] = {"commit": remoto[:10],
                      "quando": time.strftime("%Y-%m-%d %H:%M") + " (auto)"}
         STATE.write_text(json.dumps(est, indent=2))
-
-        for s in conf.get("servicos", []):
-            run(["sudo", "-n", "/usr/bin/systemctl", "restart", s], 60)
-            time.sleep(1)
+        reiniciar_servicos(conf.get("servicos", []))
         print(f"{repo}: deploy automatico {remoto[:10]} OK")
+
+    # restart pendente do painel (modo educado): executa quando ninguem esta usando
+    if PEND.exists():
+        try:
+            idade = time.time() - float(PEND.read_text().strip() or 0)
+        except Exception:
+            idade = ADIAR_MAX + 1
+        if not admin_em_uso() or idade > ADIAR_MAX:
+            try:
+                PEND.unlink()
+            except Exception:
+                pass
+            restart("vpsadmin")
+            print("vpsadmin: restart pendente executado (painel livre ou prazo esgotado)")
+        else:
+            print(f"vpsadmin: restart segue adiado ({int(idade)}s; painel em uso)")
 
 
 if __name__ == "__main__":
