@@ -1009,20 +1009,26 @@ def dialog_exportar() -> None:
     if not arqs:
         st.info("Nenhum arquivo local ainda — rode um backup primeiro.")
         return
-    st.caption(f"{len(arqs)} backups guardados no servidor (dentro da retenção "
-               "de cada perfil) — inclusive de dias atrás.")
+    st.caption(f"{len(arqs)} arquivos no servidor · cada execução gera "
+               "1 dump por banco (🗄️) + 1 pacote de segredos/configs do "
+               "servidor (🔐 — kit de recuperação de desastre).")
+    st.markdown("<style>div[data-testid='stDownloadButton'] button"
+                "{width:2.3rem;min-width:2.3rem;height:2.1rem;"
+                "min-height:2.1rem;padding:0;}</style>",
+                unsafe_allow_html=True)
     for a in arqs[:25]:
-        _ce1, _ce2 = st.columns([4.3, 1.2], vertical_alignment="center")
-        _mt = time.localtime(a.stat().st_mtime)
-        _tipo = "🔐 configs" if a.name.endswith(".tgz") else "🗄️ " + a.name.rsplit("_", 2)[0]
-        _ce1.markdown(f"<small>`{time.strftime('%d/%m/%Y %H:%M', _mt)}` · "
-                      f"{_tipo} · {a.name} · "
-                      f"{max(1, a.stat().st_size // 1024)} KB</small>",
-                      unsafe_allow_html=True)
-        _ce2.download_button("⬇ Baixar", data=a.read_bytes(),
-                             file_name=a.name, mime="application/gzip",
-                             key=f"dl_{a.name}_{int(a.stat().st_mtime)}",
-                             use_container_width=True)
+        with st.container(border=True):
+            _ce1, _ce2 = st.columns([5.6, 0.6], vertical_alignment="center")
+            _mt = time.localtime(a.stat().st_mtime)
+            _tipo = ("🔐 segredos & configs" if a.name.endswith(".tgz")
+                     else f"🗄️ banco **{a.name.rsplit('_', 2)[0]}**")
+            _ce1.markdown(f"<small>`{time.strftime('%d/%m/%Y %H:%M', _mt)}` · "
+                          f"{_tipo} · {max(1, a.stat().st_size // 1024)} KB"
+                          f"</small>", unsafe_allow_html=True)
+            _ce2.download_button("⬇", data=a.read_bytes(),
+                                 file_name=a.name, mime="application/gzip",
+                                 key=f"dl_{a.name}_{int(a.stat().st_mtime)}",
+                                 help=f"Baixar {a.name}")
 
 
 @st.dialog("✏️ Editar perfil de backup", width="large")
