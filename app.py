@@ -535,6 +535,8 @@ GIT_PROJETOS: dict[str, dict] = {
         "rotulo": "🛠️ VPS Admin (painel + LLM Gateway + MCP)",
         "mapa": {
             "app.py": "/home/ubuntu/vps-admin/app.py",
+            "infra/webhook.py": "/home/ubuntu/vps-admin/webhook.py",
+            "infra/criar_webhooks.sh": "/home/ubuntu/vps-admin/criar_webhooks.sh",
             "requirements.txt": "/home/ubuntu/vps-admin/requirements.txt",
             "autodeploy.py": "/home/ubuntu/vps-admin/autodeploy.py",
             "llm_gateway/": "/home/ubuntu/llm-gateway/",
@@ -732,6 +734,50 @@ def gh_hook_sincronizar(repo: str) -> str:
     sc, _r = _gh_api("POST", f"/repos/{GIT_USER}/{repo}/hooks",
                      {"config": cfg_h, "events": ["push"], "active": True})
     return "🟢 conectado" if sc == 201 else f"erro {sc}"
+
+
+KIT_CAMPAINHA = r"""set -e
+# 1) segredos da campainha (gerados AQUI no servidor, nunca em chat/repo)
+test -s ~/.vps_webhook_secret || { openssl rand -hex 24 > ~/.vps_webhook_secret; chmod 600 ~/.vps_webhook_secret; }
+test -s ~/.vps_webhook_rota   || { echo "hook-$(openssl rand -hex 8)" > ~/.vps_webhook_rota; chmod 600 ~/.vps_webhook_rota; }
+
+# 2) servico systemd (o webhook.py ja vem com o painel, via git)
+sudo tee /etc/systemd/system/vpswebhook.service >/dev/null <<'EOF'
+[Unit]
+Description=VPS Webhook (push->deploy estilo Vercel)
+After=network.target
+
+[Service]
+User=ubuntu
+ExecStart=/usr/bin/python3 /home/ubuntu/vps-admin/webhook.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload && sudo systemctl enable --now vpswebhook
+
+# 3) rota secreta no Nginx (server 443, sites-AVAILABLE)
+HOOKPATH=$(cat ~/.vps_webhook_rota)
+sudo HOOKPATH="$HOOKPATH" python3 - <<'PYNGINX'
+import os
+p = "/etc/nginx/sites-available/apps"
+rota = os.environ["HOOKPATH"]
+conf = open(p).read()
+if f"/{rota}/" not in conf:
+    out, ok = [], False
+    for ln in conf.splitlines(keepends=True):
+        out.append(ln)
+        if not ok and "listen 443" in ln:
+            out.append(f"    location /{rota}/ {{ proxy_pass http://127.0.0.1:8800/; }}\n")
+            ok = True
+    assert ok, "listen 443 nao encontrado"
+    open(p, "w").write("".join(out))
+PYNGINX
+sudo nginx -t && sudo systemctl reload nginx
+echo "campainha instalada — volte ao painel e clique 🔁"
+"""
 
 
 def gh_hook_desconectar(repo: str) -> str:
@@ -1409,15 +1455,20 @@ elif pagina == "🌿 Git & Deploys":
 
     with st.expander("🪝 Campainha — conectar webhooks / migrar de servidor"):
         st.caption(
-            "A campainha é **uma só** (rota secreta + segredo HMAC, vivem neste "
-            "servidor). Cada repo do GitHub aponta pra ela. **Migrou de servidor "
-            "ou domínio?** Instale o kit (`infra/INSTALL_WEBHOOK.md`) no novo e "
-            "clique 🔁 abaixo — todos os repos passam a tocar a campainha nova."
+            "A campainha é **uma só por servidor** (rota secreta + segredo HMAC). "
+            "Cada repo do GitHub aponta pra ela — e o GitHub avisa o servidor a "
+            "cada push (deploy ~5s). **Migração de servidor em 3 passos:** "
+            "1️⃣ painel novo no ar (o `webhook.py` já vem junto via git) · "
+            "2️⃣ colar o kit da campainha que aparece AQUI quando falta · "
+            "3️⃣ clicar 🔁 — todos os repos passam a tocar a campainha nova, "
+            "sem abrir o GitHub."
         )
         _url_alvo = webhook_url_atual()
         if not _url_alvo:
-            st.warning("Kit do webhook não instalado aqui (sem ~/.vps_webhook_rota). "
-                       "Receita: infra/INSTALL_WEBHOOK.md no repo do painel.")
+            st.warning("⚪ Campainha ainda NÃO instalada neste servidor — normal em "
+                       "servidor recém-migrado. Cole o bloco abaixo no SSH (1x). "
+                       "Quando terminar, esta seção vira os botões de conexão.")
+            st.code(KIT_CAMPAINHA, language="bash")
         else:
             st.markdown(f"<small>📍 campainha deste servidor: `{_url_alvo}`</small>",
                         unsafe_allow_html=True)
