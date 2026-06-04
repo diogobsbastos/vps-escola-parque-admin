@@ -1512,17 +1512,20 @@ sudo certbot --nginx -d {_d} --redirect -m diogobsbastos@gmail.com --agree-tos -
 # ============================================================
 
 elif pagina == "🌿 Git & Deploys":
+    c_t, c_add, c_wh, c_gh = st.columns([3.0, 1.4, 1.1, 1.0],
+                                        vertical_alignment="center")
+    with c_wh:
+        if st.button("🪝 Webhook", use_container_width=True,
+                     help="Campainha do push→deploy: status por repo, "
+                          "conectar/desconectar e kit de migração."):
+            dialog_webhook()
+    with c_t:
+        st.title("🌿 Git & Deploys")
+    st.markdown("<style>button[data-baseweb='tab'] p"
+                "{font-size:1.0rem;font-weight:600;}</style>",
+                unsafe_allow_html=True)
     tab_git, tab_dep = st.tabs(["🐙 GitHub", "🚀 Deploys"])
     with tab_git:
-        c_t, c_add, c_wh, c_gh = st.columns([3.0, 1.4, 1.1, 1.0],
-                                            vertical_alignment="center")
-        with c_wh:
-            if st.button("🪝 Webhook", use_container_width=True,
-                         help="Campainha do push→deploy: status por repo, "
-                              "conectar/desconectar e kit de migração."):
-                dialog_webhook()
-        with c_t:
-            st.title("🌿 Git & Deploys")
         with c_add:
             _form_aberto = bool(st.session_state.get("form_repo"))
             if st.button("✖ Fechar formulário" if _form_aberto else "➕ Conectar repo",
