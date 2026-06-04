@@ -83,3 +83,5 @@ GitHub → POST `https://oracle-vipworks.duckdns.org/hook-XXXX/` (rota secreta) 
 Segurança: 2 camadas (rota secreta + HMAC); assinatura inválida = 401 descartado; porta 8800 só em localhost; segredos só no servidor (chmod 600).
 
 ⚠️ Pendência de higiene Git: `webhook.py` foi escrito direto via MCP (sandbox desta sessão sem o token GitHub — pasta AUTOMACOES não montada). Na próxima sessão com AUTOMACOES montada: commitar `webhook.py` + este kit no repo `vps-escola-parque-admin` (infra/).
+
+> ✅ Fluxo validado ao vivo em 04/06/2026: push → webhook → vigia → produção em segundos.
