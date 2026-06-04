@@ -110,3 +110,20 @@ async def proxy(path: str, request: Request):
     try:
         req = client.build_request(
             request.method, url, content=body,
+            params=dict(request.query_params), headers=fwd_headers,
+        )
+        r = await client.send(req, stream=True)
+    except Exception as e:  # noqa: BLE001
+        await client.aclose()
+        return JSONResponse({"error": f"falha ao falar com o Ollama: {e}"}, status_code=502)
+
+    async def _close():
+        await r.aclose()
+        await client.aclose()
+
+    return StreamingResponse(
+        r.aiter_raw(),
+        status_code=r.status_code,
+        media_type=r.headers.get("content-type", "application/json"),
+        background=BackgroundTask(_close),
+    )

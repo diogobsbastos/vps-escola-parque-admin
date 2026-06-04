@@ -1229,4 +1229,245 @@ elif pagina == "🔌 Acesso MCP (Claude)":
 
 # ============================================================
 # PAGINA: Disco & Sistema
-# =======================================
+# ============================================================
+
+elif pagina == "💾 Servidor & Limites":
+    st.title("💾 Servidor & Limites (Always Free)")
+
+    # ---- Identidade do Servidor (fonte única de verdade — estilo WordPress "Site URL") ----
+    st.subheader("🌍 Identidade do Servidor")
+    with st.container(border=True):
+        _val = cert_validade(DOMINIO)
+        c_id, c_mig = st.columns([4, 1.4], vertical_alignment="center")
+        c_id.markdown(
+            f"**Domínio:** [`{DOMINIO}`]({URL_BASE}) · **IP:** `{IP_PUBLICO}`  \n"
+            f"🔒 **HTTPS Let's Encrypt** — "
+            + (f"certificado válido até `{_val}`" if _val else "⚠️ não consegui ler o certificado")
+            + " · renovação automática (certbot)  \n"
+            f"🦆 DNS: **DuckDNS** (Google `diogobsbastos@gmail.com`) · "
+            f"📄 Fonte única: `~/.vps_config.json` — mudou lá, o painel INTEIRO se adapta."
+        )
+        if c_mig.button("🔁 Migrar domínio", use_container_width=True,
+                        help="Troca o domínio/HTTPS do servidor: grava a nova config e "
+                             "gera o kit de comandos (certbot + Nginx)."):
+            st.session_state["form_migrar"] = not st.session_state.get("form_migrar", False)
+
+    # ---- Página inicial do domínio (pra onde a raiz / redireciona) ----
+    KIT_ROTA_RAIZ = """sudo tee /usr/local/bin/vps_rota_raiz.sh > /dev/null <<'EOF'
+#!/bin/bash
+set -e
+ROTA="$1"
+echo "$ROTA" | grep -Eq '^/[a-zA-Z0-9/_-]*$' || { echo "rota invalida"; exit 1; }
+CONF=/etc/nginx/sites-available/apps
+if grep -q "location = /" "$CONF"; then
+  sed -i "s|location = / { return 302 [^;]*; }|location = / { return 302 $ROTA; }|" "$CONF"
+else
+  sed -i "/listen 443 ssl/a\\    location = / { return 302 $ROTA; }" "$CONF"
+fi
+nginx -t && systemctl reload nginx
+EOF
+sudo chmod 755 /usr/local/bin/vps_rota_raiz.sh
+echo 'ubuntu ALL=(ALL) NOPASSWD: /usr/local/bin/vps_rota_raiz.sh' | sudo tee /etc/sudoers.d/vpsadmin-rota > /dev/null
+sudo chmod 440 /etc/sudoers.d/vpsadmin-rota"""
+    with st.container(border=True):
+        c_h, c_sel, c_ok = st.columns([2.7, 1.8, 1], vertical_alignment="bottom")
+        c_h.markdown(
+            "**🏠 Página inicial do domínio**  \n"
+            f"Quem abre `{DOMINIO}/` cai em qual app?"
+        )
+        _rotas_disp = sorted(set(ROTAS_APPS.values()))
+        _raiz_atual = _cfg.get("rota_raiz", "/escola-parque/")
+        _idx_raiz = _rotas_disp.index(_raiz_atual) if _raiz_atual in _rotas_disp else 0
+        rota_home = c_sel.selectbox("Rota padrão da raiz", _rotas_disp, index=_idx_raiz)
+        if c_ok.button("Salvar 🏠", type="primary", use_container_width=True):
+            rc_h, out_h = _run(["sudo", "-n", "/usr/local/bin/vps_rota_raiz.sh", rota_home],
+                               timeout=30)
+            if rc_h == 0:
+                config_salvar("rota_raiz", rota_home)
+                st.success(f"✅ Raiz `/` agora abre **{rota_home}** — testa: {URL_BASE}/")
+            else:
+                st.error("Helper não instalado ainda (ou falhou). Instala com o kit abaixo "
+                         "(uma vez só, no SSH): " + (out_h or "")[:200])
+                st.code(KIT_ROTA_RAIZ, language="bash")
+
+    if st.session_state.get("form_migrar"):
+        with st.container(border=True):
+            with st.form("migrar_https", border=False):
+                m1, m2, m3 = st.columns([2.4, 1.6, 1], vertical_alignment="bottom")
+                novo_dom = m1.text_input("Novo domínio (DNS já apontando pro IP)", value=DOMINIO)
+                novo_ip = m2.text_input("IP público", value=IP_PUBLICO)
+                gerar_mig = m3.form_submit_button("Gerar kit 🔧", type="primary",
+                                                  use_container_width=True)
+            if gerar_mig and novo_dom.strip():
+                _nd, _ni = novo_dom.strip(), novo_ip.strip()
+                try:
+                    CONFIG_PATH.write_text(json.dumps({"ip": _ni, "dominio": _nd}, indent=2))
+                    st.success(f"`~/.vps_config.json` gravado → painel passa a usar "
+                               f"**https://{_nd}** após o passo 3 do kit.")
+                except Exception as e:  # noqa: BLE001
+                    st.error(f"Falha ao gravar a config: {e}")
+                st.markdown("**KIT DE MIGRAÇÃO — rode no terminal SSH (bloco único):**")
+                st.code(
+                    f"""# 1) Nginx atende pelo novo nome
+sudo sed -i 's/server_name[^;]*;/server_name {_nd};/' /etc/nginx/sites-available/apps
+sudo nginx -t && sudo systemctl reload nginx
+
+# 2) Certificado HTTPS do novo dominio (renovacao automatica inclusa)
+sudo certbot --nginx -d {_nd} --redirect -m diogobsbastos@gmail.com --agree-tos --no-eff-email
+
+# 3) Painel rele a config
+sudo systemctl restart vpsadmin
+
+# 4) Teste
+curl -s -o /dev/null -w "%{{http_code}}\\n" https://{_nd}/admin/""",
+                    language="bash",
+                )
+                st.caption("⚠️ Depois da migração: atualizar a URL do conector MCP no Claude "
+                           "e o base_url dos clientes da API da LLM (o domínio antigo para de valer).")
+
+    st.divider()
+
+    # ---- Specs da maquina ----
+    st.subheader("🖥️ Especificações desta instância")
+    disco = psutil.disk_usage("/") if psutil else None
+    if psutil:
+        n_ocpu = psutil.cpu_count(logical=True) or 4
+        ram_total = psutil.virtual_memory().total / 1e9
+        _, arch = _run(["uname", "-m"])
+        s1, s2, s3, s4 = st.columns(4)
+        s1.metric("OCPUs (vCPU)", n_ocpu)
+        s2.metric("RAM total", f"{ram_total:.0f} GB")
+        s3.metric("Disco /", f"{disco.total/1e9:.0f} GB")
+        s4.metric("Arquitetura", (arch or "aarch64"))
+        st.caption(
+            f"Shape **VM.Standard.A1.Flex** (Ampere ARM) · Brazil East (São Paulo) · "
+            f"IP `{IP_PUBLICO}` · conta **Always Free**"
+        )
+
+    st.divider()
+    st.subheader("📊 Uso em tempo real")
+    if psutil:
+        cpu = psutil.cpu_percent(interval=0.5)
+        mem = psutil.virtual_memory()
+        r1, r2, r3, r4 = st.columns(4)
+        r1.metric("CPU", f"{cpu:.0f}%"); r1.progress(min(cpu/100, 1.0))
+        r2.metric("RAM", f"{mem.percent:.0f}%", f"{mem.used/1e9:.1f}/{mem.total/1e9:.0f} GB")
+        r2.progress(min(mem.percent/100, 1.0))
+        r3.metric("Disco", f"{disco.percent:.0f}%", f"{disco.used/1e9:.1f}/{disco.total/1e9:.0f} GB")
+        r3.progress(min(disco.percent/100, 1.0))
+        try:
+            carga = ", ".join(f"{x:.2f}" for x in psutil.getloadavg())
+        except Exception:
+            carga = "—"
+        _, uptime = _run(["uptime", "-p"])
+        r4.metric("Load 1/5/15m", carga); r4.caption(f"⏱️ {uptime}")
+
+    st.divider()
+    st.subheader("💰 Cota gratuita × cobrança")
+    st.caption(
+        "A Oracle cobra se você ULTRAPASSAR estes limites mensais. Consumo ESTIMADO desta "
+        "instância 24/7 — pra você ver a folga ANTES de criar mais recursos."
+    )
+    st.caption("🟢 Folga · 🟡 No teto do gratuito (continua R$ 0) · 🔴 Ultrapassou (gera cobrança)")
+
+    AJUDA_OCPU = (
+        "Pense num plano pré-pago de CPU: você ganha 3.000 'horas-de-CPU' grátis por mês. "
+        "Sua máquina tem 4 CPUs, então cada hora ligada gasta 4 horas do bolo. "
+        "4 CPUs × ~720h do mês = ~2.880h. Está DENTRO do limite = R$ 0. "
+        "Só cobraria se passasse de 3.000 (ex.: ligando uma 2ª máquina ARM 24/7)."
+    )
+    AJUDA_RAM = (
+        "Mesma lógica, mas pra memória: 18.000 'GB-horas' grátis por mês. "
+        "Seus 24 GB ligados o mês todo = ~17.300 GB-h. Dentro do limite = R$ 0. "
+        "É o teto esperado de quem usa a máquina máxima do gratuito — está tudo certo."
+    )
+
+    import calendar as _cal
+    from datetime import datetime as _dt
+    _h = _cal.monthrange(_dt.utcnow().year, _dt.utcnow().month)[1] * 24
+    n_ocpu = (psutil.cpu_count(logical=True) or 4) if psutil else 4
+    ram_gb = round((psutil.virtual_memory().total / 1e9) if psutil else 24)
+    ocpu_h, gb_h, LIM_O, LIM_G = n_ocpu * _h, ram_gb * _h, 3000, 18000
+    egress_gb = (psutil.net_io_counters().bytes_sent / 1e9) if psutil else 0.0
+
+    def _lim(nome, usado, limite, un, ajuda=None):
+        pct_real = (usado / limite) if limite else 0
+        if pct_real > 1.0:
+            tag, cor = "🔴 Ultrapassou (cobrança)", "#fbeae7"
+        elif pct_real >= 0.8:
+            tag, cor = "🟡 No teto do gratuito (R$ 0)", "#fdf3df"
+        else:
+            tag, cor = "🟢 Folga", "#e6f4ec"
+        with st.container(border=True):
+            c1, c2, c3 = st.columns([3, 1.4, 1.6])
+            c1.markdown(f"**{nome}**"); c1.progress(min(pct_real, 1.0))
+            c2.metric("Usado (est.)", f"{usado:,.0f} {un}".replace(",", "."), help=ajuda)
+            c3.markdown(
+                f"<div style='background:{cor};border-radius:8px;padding:6px 10px;text-align:center;font-size:0.85em;'>"
+                f"{tag}<br>{pct_real*100:.0f}% de {limite:,} {un}</div>".replace(",", "."),
+                unsafe_allow_html=True,
+            )
+
+    _lim("Compute ARM — OCPU-horas/mês ❓", ocpu_h, LIM_O, "h", ajuda=AJUDA_OCPU)
+    _lim("Compute ARM — GB-horas/mês (RAM) ❓", gb_h, LIM_G, "h", ajuda=AJUDA_RAM)
+    _lim("Block Storage (disco usado)", (disco.used/1e9) if psutil else 47, 200, "GB")
+    _lim("Tráfego de saída (desde o boot)", egress_gb, 10000, "GB")
+
+    st.warning(
+        f"⚠️ **Leitura crítica:** esta instância (4 OCPU / 24 GB, 24/7) já consome "
+        f"~{ocpu_h/LIM_O*100:.0f}% da cota gratuita de **compute ARM** sozinha. "
+        "Criar uma SEGUNDA instância ARM ligada o tempo todo **passa do limite e gera cobrança**. "
+        "Instâncias desligadas não contam horas. Disco (200 GB) e tráfego (10 TB) têm muita folga."
+    )
+
+    st.divider()
+    st.subheader("📁 Maiores pastas (home)")
+    rc, out = _run(["bash", "-c", "du -sh /home/ubuntu/*/ 2>/dev/null | sort -rh | head -10"], timeout=60)
+    st.code(out or "—")
+    st.caption("Cota de disco: 200 GB no total (boot volume ~48 GB; resto disponível p/ expandir/anexar, grátis).")
+
+
+# ============================================================
+# PAGINA: Conta
+# ============================================================
+
+elif pagina == "👤 Conta":
+    st.title("👤 Conta do administrador")
+    usuario = carregar_usuario()
+    col_dados, col_senha = st.columns(2)
+
+    with col_dados:
+        with st.container(border=True):
+            st.markdown("**Dados cadastrados**")
+            novo_nome = st.text_input("Nome", value=usuario.get("nome", ""))
+            novo_email = st.text_input("E-mail (recuperação/contato)", value=usuario.get("email", ""))
+            if st.button("💾 Salvar dados", use_container_width=True):
+                if salvar_usuario({"nome": novo_nome.strip(), "email": novo_email.strip()}):
+                    st.success("Dados salvos.")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("Falha ao salvar (permissões?).")
+
+    with col_senha:
+        with st.container(border=True):
+            st.markdown("**Trocar senha do painel**")
+            s_atual = st.text_input("Senha atual", type="password", key="pw_atual")
+            s_nova = st.text_input("Nova senha (mín. 8 caracteres)", type="password", key="pw_nova")
+            s_conf = st.text_input("Confirmar nova senha", type="password", key="pw_conf")
+            if st.button("🔒 Trocar senha", type="primary", use_container_width=True):
+                if not checar_senha(s_atual):
+                    st.error("Senha atual incorreta.")
+                elif len(s_nova) < 8:
+                    st.error("A nova senha precisa ter pelo menos 8 caracteres.")
+                elif s_nova != s_conf:
+                    st.error("A confirmação não confere.")
+                else:
+                    try:
+                        SENHA_PATH.write_text(s_nova)
+                        SENHA_PATH.chmod(0o600)
+                        st.success("Senha trocada! Use a nova no próximo login.")
+                    except Exception as e:  # noqa: BLE001
+                        st.error(f"Falha ao trocar senha: {e}")
+
+st.sidebar.caption("VPS Admin v2.0 · base replicável p/ futuras VPS")
