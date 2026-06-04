@@ -954,6 +954,69 @@ def jwt_banco(role: str, dias: int = 3650) -> str:
     return (h + b"." + p + b"." + s).decode()
 
 
+@st.dialog("☁️ Conectar Google Drive — service account", width="large")
+def dialog_drive() -> None:
+    st.markdown(
+        "<small>**Uma vez só, no navegador do PC:** "
+        "1️⃣ console.cloud.google.com → projeto novo (ex.: vps-backups) · "
+        "2️⃣ APIs & Services → Library → **Google Drive API** → Enable · "
+        "3️⃣ Credentials → Create credentials → **Service account** → criar · "
+        "4️⃣ na service account → Keys → Add key → **JSON** (baixa o arquivo) · "
+        "5️⃣ no SEU Drive: crie a pasta de backups e **compartilhe** com o "
+        "e-mail da service account (xxx@…iam.gserviceaccount.com) como "
+        "**Editor** · 6️⃣ copie o ID da pasta (URL: /folders/<b>ID</b>).</small>",
+        unsafe_allow_html=True)
+    sa_up = st.file_uploader("Chave JSON da service account", type=["json"],
+                             key="sa_up_dlg")
+    fid = st.text_input("ID da pasta do Drive (compartilhada com o robô)",
+                        key="sa_fid_dlg",
+                        placeholder="ex.: 1AbC2dEf3GhI4jKl5MnO6pQr")
+    if st.button("🔌 Conectar Drive", type="primary",
+                 use_container_width=True):
+        if not sa_up:
+            st.error("Suba o arquivo JSON primeiro.")
+            return
+        try:
+            sa_p = Path.home() / ".gdrive_sa.json"
+            sa_p.write_bytes(sa_up.getvalue())
+            os.chmod(sa_p, 0o600)
+            rclone_conf_gdrive(str(sa_p), fid or "")
+            rc_t, out_t = _run(["rclone", "lsd", "gdrive:"], timeout=30)
+            if rc_t == 0:
+                st.success("✅ Drive conectado! Use destino `gdrive:` (raiz) "
+                           "ou `gdrive:Subpasta` nos perfis.")
+            else:
+                st.error("rclone não conectou: " + (out_t or "?")[-300:])
+        except Exception as e:  # noqa: BLE001
+            st.error(f"falha: {e}")
+
+
+@st.dialog("⬇ Exportar dumps", width="large")
+def dialog_exportar() -> None:
+    try:
+        jobs_x = json.loads((Path.home() / ".vps_backup.json").read_text()
+                            ).get("jobs", [])
+    except Exception:
+        jobs_x = []
+    locais = {str(j.get("destino")) for j in jobs_x
+              if str(j.get("destino", "")).startswith("/")}
+    arqs = []
+    for d in locais:
+        dp = Path(d)
+        if dp.exists():
+            arqs += list(dp.glob("*.sql.gz")) + list(dp.glob("*.tgz"))
+    arqs = sorted(arqs, key=lambda p: p.stat().st_mtime, reverse=True)[:30]
+    if not arqs:
+        st.info("Nenhum arquivo local ainda — rode um backup primeiro.")
+        return
+    esc = st.selectbox("Arquivo (mais recentes primeiro)",
+                       [str(a) for a in arqs])
+    p_esc = Path(esc)
+    st.download_button(f"⬇ Baixar {p_esc.name}", data=p_esc.read_bytes(),
+                       file_name=p_esc.name, mime="application/gzip",
+                       use_container_width=True)
+
+
 @st.dialog("✏️ Editar perfil de backup", width="large")
 def dialog_editar_backup(job_id: str) -> None:
     BK_CFG_D = Path.home() / ".vps_backup.json"
@@ -2531,12 +2594,19 @@ elif pagina == "🐘 Supabase VPS":
 
         _DIAS_LBL = {1: "seg", 2: "ter", 3: "qua", 4: "qui", 5: "sex",
                      6: "sáb", 7: "dom"}
-        c_bk1, c_bk2 = st.columns([4.2, 1.5], vertical_alignment="center")
+        c_bk1, c_bkd, c_bke, c_bk2 = st.columns([2.7, 1.0, 1.1, 1.3],
+                                                vertical_alignment="center")
         c_bk1.caption(
-            "Perfis independentes — cada um com agenda (dias + hora), destino "
-            "(📁 pasta local ou ☁️ nuvem via rclone) e retenção próprios. "
+            "Perfis independentes — agenda, destino e retenção próprios. "
             "O timer ronda de hora em hora e executa quem estiver no horário."
         )
+        if c_bkd.button("☁️ Drive", use_container_width=True,
+                        help="Conectar Google Drive (service account, sem "
+                             "navegador no servidor)."):
+            dialog_drive()
+        if c_bke.button("⬇ Exportar", use_container_width=True,
+                        help="Baixar dumps locais pelo navegador."):
+            dialog_exportar()
         _f_nj = bool(st.session_state.get("form_novo_bk"))
         if c_bk2.button("✖ Fechar" if _f_nj else "➕ Novo backup",
                         type="secondary" if _f_nj else "primary",
@@ -2630,61 +2700,6 @@ elif pagina == "🐘 Supabase VPS":
                     _salvar_jobs()
                     st.rerun()
 
-        with st.expander("☁️ Conectar Google Drive — modo profissional "
-                         "(service account, sem navegador no servidor)"):
-            st.markdown(
-                "<small>**Uma vez só, no navegador do PC:** "
-                "1️⃣ console.cloud.google.com → projeto novo (ex.: vps-backups) · "
-                "2️⃣ APIs & Services → Library → **Google Drive API** → Enable · "
-                "3️⃣ Credentials → Create credentials → **Service account** → "
-                "criar · 4️⃣ na service account → Keys → Add key → **JSON** "
-                "(baixa o arquivo) · 5️⃣ no SEU Drive: crie a pasta de backups e "
-                "**compartilhe** com o e-mail da service account "
-                "(xxx@…iam.gserviceaccount.com) como **Editor** · 6️⃣ copie o ID "
-                "da pasta (URL: /folders/<b>ID</b>) e preencha abaixo.</small>",
-                unsafe_allow_html=True)
-            _sa_up = st.file_uploader("Chave JSON da service account",
-                                      type=["json"], key="sa_up")
-            _fid = st.text_input("ID da pasta do Drive (compartilhada com o robô)",
-                                 key="sa_fid",
-                                 placeholder="ex.: 1AbC2dEf3GhI4jKl5MnO6pQr")
-            if st.button("🔌 Conectar Drive", type="primary"):
-                if not _sa_up:
-                    st.error("Suba o arquivo JSON primeiro.")
-                else:
-                    try:
-                        _sa_p = Path.home() / ".gdrive_sa.json"
-                        _sa_p.write_bytes(_sa_up.getvalue())
-                        os.chmod(_sa_p, 0o600)
-                        rclone_conf_gdrive(str(_sa_p), _fid or "")
-                        _rc_t, _out_t = _run(["rclone", "lsd", "gdrive:"],
-                                             timeout=30)
-                        if _rc_t == 0:
-                            st.success("✅ Drive conectado! Use destino "
-                                       "`gdrive:` (raiz da pasta) ou "
-                                       "`gdrive:Subpasta` nos perfis.")
-                        else:
-                            st.error("rclone não conectou: "
-                                     + (_out_t or "?")[-300:])
-                    except Exception as e:  # noqa: BLE001
-                        st.error(f"falha: {e}")
-
-        _locais = [Path(str(_j.get("destino", ""))) for _j in _jobs
-                   if str(_j.get("destino", "")).startswith("/")]
-        _arqs_bk = []
-        for _d in set(_locais):
-            if _d.exists():
-                _arqs_bk += list(_d.glob("*.sql.gz"))
-        _arqs_bk = sorted(_arqs_bk, key=lambda p: p.stat().st_mtime,
-                          reverse=True)[:20]
-        if _arqs_bk:
-            with st.expander(f"⬇ Exportar dumps locais ({len(_arqs_bk)})"):
-                _esc_bk = st.selectbox("Arquivo", [str(a) for a in _arqs_bk])
-                _p_esc = Path(_esc_bk)
-                st.download_button(f"⬇ Baixar {_p_esc.name}",
-                                   data=_p_esc.read_bytes(),
-                                   file_name=_p_esc.name,
-                                   mime="application/gzip")
         st.caption("Restaurar: `gunzip -c ARQ.sql.gz | sudo -u postgres psql "
                    "-d BANCO` · cada execução também guarda `configs_*.tgz` "
                    "(segredos do servidor).")
