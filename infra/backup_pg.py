@@ -69,6 +69,8 @@ def main() -> None:
             if job.get("hora", "03") != hora or dow not in job.get("dias", []):
                 continue
         rodou += 1
+        sel = job.get("bancos") or []
+        alvo_dbs = [d for d in bancos if not sel or d in sel]
         dest = str(job.get("destino", "")).strip()
         carimbo = time.strftime("%F_%H%M")
         stage = Path(f"/tmp/bkstage_{job.get('id', 'x')}")
@@ -76,7 +78,7 @@ def main() -> None:
         stage.mkdir(parents=True)
         ok, msgs = True, []
 
-        for db in bancos:
+        for db in alvo_dbs:
             p1 = subprocess.run(["pg_dump", "-h", "127.0.0.1", "-U", adm["user"],
                                  "-d", db], capture_output=True, env=env,
                                 timeout=600)

@@ -977,6 +977,14 @@ def dialog_editar_backup(job_id: str) -> None:
     dias_e = st.multiselect("Dias da semana", list(DIAS_D.values()),
                             default=[DIAS_D[d] for d in job.get("dias", [])
                                      if d in DIAS_D])
+    ok_bd_e, out_bd_e = psql_run(
+        "select datname from pg_database where not datistemplate "
+        "and datname <> 'postgres' order by 1;", banco="postgres")
+    _opts_bd_e = ([l["datname"] for l in csv_linhas(out_bd_e)]
+                  if ok_bd_e else [])
+    bancos_e = st.multiselect(
+        "Bancos incluídos (vazio = TODOS, inclusive futuros)", _opts_bd_e,
+        default=[b for b in job.get("bancos", []) if b in _opts_bd_e])
     dest_e = st.text_input("Destino (pasta local ou remote rclone)",
                            value=job.get("destino", ""))
     if st.button("💾 Salvar alterações", type="primary",
@@ -987,6 +995,7 @@ def dialog_editar_backup(job_id: str) -> None:
             "manter_dias": int(ret_e),
             "dias": [k for k, v in DIAS_D.items() if v in dias_e]
                     or job.get("dias", [1, 2, 3, 4, 5, 6, 7]),
+            "bancos": bancos_e,
             "destino": dest_e.strip() or job.get("destino", "")})
         BK_CFG_D.write_text(json.dumps({"jobs": jobs_d},
                                        ensure_ascii=False, indent=1))
@@ -2546,6 +2555,9 @@ elif pagina == "🐘 Supabase VPS":
                     _dias_bk = st.multiselect("Dias da semana",
                                               list(_DIAS_LBL.values()),
                                               default=list(_DIAS_LBL.values()))
+                    _bks_bk = st.multiselect(
+                        "Bancos incluídos (vazio = TODOS, inclusive futuros)",
+                        [b for b in _bancos if b != "postgres"], default=[])
                     _dest_bk = st.text_input(
                         "Destino — pasta local OU remote rclone",
                         placeholder="/home/ubuntu/backups_extra   ·   gdrive:BackupsVPS",
@@ -2564,6 +2576,7 @@ elif pagina == "🐘 Supabase VPS":
                         "dias": [k for k, v in _DIAS_LBL.items()
                                  if v in _dias_bk] or [1, 2, 3, 4, 5, 6, 7],
                         "destino": _dest_bk.strip(),
+                        "bancos": _bks_bk,
                         "manter_dias": int(_ret_bk)})
                     _salvar_jobs()
                     st.session_state["form_novo_bk"] = False
@@ -2587,6 +2600,7 @@ elif pagina == "🐘 Supabase VPS":
                 cj1.markdown(
                     f"**{_j.get('nome', _j.get('id', '?'))}**  \n"
                     f"<small>🕐 {_j.get('hora', '03')}:30 · {_dias_txt} · "
+                    f"🗄️ {', '.join(_j.get('bancos')) if _j.get('bancos') else 'todos os bancos'} · "
                     f"📦 retém {_j.get('manter_dias', 7)}d · "
                     f"➡️ `{_j.get('destino', '?')}`  \n"
                     f"🧾 {_ult_j.get('quando', 'nunca rodou')} "
