@@ -470,6 +470,28 @@ GIT_PROJETOS: dict[str, dict] = {
 }
 
 
+GIT_PROJ_PATH = Path.home() / ".vps_git_projetos.json"
+
+
+def git_projetos_extras() -> dict:
+    try:
+        return json.loads(GIT_PROJ_PATH.read_text())
+    except Exception:
+        return {}
+
+
+def salvar_git_projetos(extras: dict) -> bool:
+    try:
+        GIT_PROJ_PATH.write_text(json.dumps(extras, ensure_ascii=False, indent=2))
+        return True
+    except Exception:
+        return False
+
+
+def todos_git_projetos() -> dict:
+    return {**GIT_PROJETOS, **git_projetos_extras()}
+
+
 @st.cache_data(ttl=60, show_spinner=False)
 def git_remote_head(repo: str) -> str:
     """Ultimo commit no GitHub (sem clonar). Cache 60s."""
@@ -943,12 +965,44 @@ elif pagina == "🌐 Rotas Nginx":
 # ============================================================
 
 elif pagina == "🌿 Git & Deploys":
-    c_t, c_gh = st.columns([4.4, 1.3], vertical_alignment="center")
+    c_t, c_add, c_gh = st.columns([3.6, 1.5, 1.2], vertical_alignment="center")
     with c_t:
         st.title("🌿 Git & Deploys")
+    with c_add:
+        if st.button("➕ Conectar repo", type="primary", use_container_width=True):
+            st.session_state["form_repo"] = not st.session_state.get("form_repo", False)
     with c_gh:
         st.link_button("🐙 GitHub", f"https://github.com/{GIT_USER}?tab=repositories",
                        use_container_width=True)
+    if st.session_state.get("form_repo"):
+        with st.container(border=True):
+            st.markdown("**Conectar um repositório do GitHub a uma pasta do servidor**")
+            with st.form("conectar_repo", clear_on_submit=True, border=False):
+                f1, f2 = st.columns(2)
+                repo_novo = f1.text_input(f"Repo (em github.com/{GIT_USER}/...)",
+                                          placeholder="ex.: sertanejo-lab")
+                rotulo_novo = f2.text_input("Rótulo no painel (com emoji!)",
+                                            placeholder="🎸 Sertanejo Lab")
+                f3, f4 = st.columns(2)
+                pasta_nova = f3.text_input("Pasta no servidor (deve ser um clone do repo)",
+                                           placeholder="/home/ubuntu/sertanejo-lab")
+                svc_novos = f4.multiselect("Serviços a reiniciar no deploy",
+                                           list(todos_servicos().keys()))
+                ok_repo = st.form_submit_button("Conectar 🌿", type="primary")
+            if ok_repo and repo_novo.strip() and pasta_nova.strip():
+                extras_r = git_projetos_extras()
+                extras_r[repo_novo.strip()] = {
+                    "rotulo": rotulo_novo.strip() or repo_novo.strip(),
+                    "pull": pasta_nova.strip(),
+                    "servicos": svc_novos,
+                }
+                if salvar_git_projetos(extras_r):
+                    st.session_state["form_repo"] = False
+                    st.rerun()
+                else:
+                    st.error("Falha ao salvar o registro.")
+            elif ok_repo:
+                st.error("Preencha pelo menos o repo e a pasta.")
     st.caption(
         "A ponte oficial da casa: **PC (oficina) → GitHub privado (cartório) → "
         "Servidor (produção)**. ↻ Atualizar = puxa o último commit, aplica nas "
@@ -956,7 +1010,8 @@ elif pagina == "🌿 Git & Deploys":
         "Histórico e rollback ficam no GitHub."
     )
     estado = git_estado()
-    for repo, conf in GIT_PROJETOS.items():
+    _extras_git = git_projetos_extras()
+    for repo, conf in todos_git_projetos().items():
         with st.container(border=True):
             remoto = git_remote_head(repo)
             info = estado.get(repo, {})
@@ -994,6 +1049,12 @@ elif pagina == "🌿 Git & Deploys":
                     st.rerun()
                 else:
                     st.error("Deploy falhou: " + msg)
+            if repo in _extras_git:
+                if st.button("🗑️ Desconectar do painel (não apaga nada)",
+                             key=f"unrepo_{repo}"):
+                    _extras_git.pop(repo, None)
+                    salvar_git_projetos(_extras_git)
+                    st.rerun()
     st.divider()
     st.caption(
         "🔜 Próximos a conectar: `escola-parque` e `sertanejo-lab` (entram aqui "
