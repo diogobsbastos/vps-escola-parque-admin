@@ -83,6 +83,20 @@ ROTAS_APPS: dict[str, str] = {
     "sertanejolab": "/sertanejo/",
 }
 
+# Apps em DOMÍNIO PRÓPRIO (serviço -> URL completa)
+URLS_EXTERNAS: dict[str, str] = {
+    "innovafront": "https://escolaparque-app.duckdns.org",
+}
+
+
+def url_acesso(nome: str) -> str:
+    """URL de acesso do app (subpasta do domínio-mãe OU domínio próprio)."""
+    if nome in URLS_EXTERNAS:
+        return URLS_EXTERNAS[nome]
+    if nome in ROTAS_APPS:
+        return URL_BASE + ROTAS_APPS[nome]
+    return ""
+
 
 # ============================================================
 # Helpers — sistema
@@ -1570,7 +1584,7 @@ elif pagina == "🚀 Aplicativos":
             for _s in _c.get("servicos", []):
                 _git_svc[_s] = _r
         _svcs_ord = sorted(todos_servicos().items(),
-                           key=lambda kv: (kv[0] not in ROTAS_APPS, kv[1]))
+                           key=lambda kv: (not url_acesso(kv[0]), kv[1]))
         for nome, rotulo in _svcs_ord:
             stt = status_servico(nome)
             cor = {"active": "🟢", "inactive": "⚪", "failed": "🔴"}.get(stt, "🟡")
@@ -1601,9 +1615,9 @@ elif pagina == "🚀 Aplicativos":
                         time.sleep(1)
                         st.rerun()
                 mostrar = c4.toggle("Logs", key=f"l_{nome}")
-                if nome in ROTAS_APPS:
+                if url_acesso(nome):
                     c5.markdown(
-                        f'<a href="{URL_BASE}{ROTAS_APPS[nome]}" target="_blank" '
+                        f'<a href="{url_acesso(nome)}" target="_blank" '
                         f'style="display:inline-block;width:100%;box-sizing:border-box;'
                         f'background:#16a34a;color:#fff;text-decoration:none;'
                         f'padding:.34rem .2rem;border-radius:.5rem;font-weight:600;'
