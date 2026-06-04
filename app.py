@@ -70,6 +70,7 @@ SERVICOS_BASE: dict[str, str] = {
     "innovafront":         "🚀 Innova Front (Next.js)",
     "vpswebhook":          "🪝 Webhook (campainha do deploy)",
     "postgresql":          "🗄️ PostgreSQL 17 (banco interno)",
+    "postgrest":           "🔗 PostgREST (API do banco — /rest/v1)",
 }
 
 ACOES = ("restart", "stop", "start")
@@ -1184,7 +1185,7 @@ if pagina == "📊 Dashboard":
         ("🚀 Frontend (Innova Exams)", ["innovafront"]),
         ("🎸 Sertanejo", ["sertanejolab"]),
         ("🧰 Infra & IA", ["vpsadmin", "nginx", "ollama", "llmgateway",
-                           "vpsmcp", "vpswebhook", "postgresql"]),
+                           "vpsmcp", "vpswebhook", "postgresql", "postgrest"]),
     ]
     _svcs = todos_servicos()
     _agrupados = {s for _, _ss in REGIOES for s in _ss}

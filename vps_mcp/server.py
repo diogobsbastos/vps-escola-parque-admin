@@ -33,7 +33,7 @@ PASTAS_OK = [
 SERVICOS_OK = {
     "escolaparque", "escolaparque-worker", "vpsadmin",
     "nginx", "ollama", "llmgateway", "sertanejolab", "vpsmcp",
-    "innovafront", "vpswebhook", "postgresql",
+    "innovafront", "vpswebhook", "postgresql", "postgrest",
 }
 ACOES_OK = {"restart", "stop", "start", "status"}
 
