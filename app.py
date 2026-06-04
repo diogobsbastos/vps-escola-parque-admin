@@ -695,8 +695,7 @@ def webhook_url_atual() -> str:
         rota = (Path.home() / ".vps_webhook_rota").read_text().strip()
     except Exception:
         return ""
-    dominio = _cfg.get("dominio") or _cfg.get("ip") or ""
-    return f"https://{dominio}/{rota}/" if dominio and rota else ""
+    return f"{URL_BASE}/{rota}/" if rota else ""
 
 
 @st.cache_data(ttl=300, show_spinner=False)
