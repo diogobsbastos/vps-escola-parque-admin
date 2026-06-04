@@ -1569,19 +1569,26 @@ elif pagina == "🌿 Git & Deploys":
                     _situ_h = "🟢 conectado nesta campainha"
                 else:
                     _situ_h = "🟠 aponta pra OUTRA campainha (servidor antigo?)"
-                _cA, _cB, _cC = st.columns([3.6, 1.1, 1.3],
-                                           vertical_alignment="center")
+                _cA, _cB = st.columns([4.7, 1.3], vertical_alignment="center")
                 _cA.markdown(f"`{_r}` · {_situ_h}")
-                if _cB.button("🔗 Conectar", key=f"whc_{_r}",
-                              use_container_width=True):
-                    st.toast(f"{_r}: {gh_hook_sincronizar(_r)}")
-                    gh_hook_do_repo.clear()
-                    st.rerun()
-                if _cC.button("✂️ Desconectar", key=f"whd_{_r}",
-                              use_container_width=True):
-                    st.toast(f"{_r}: {gh_hook_desconectar(_r)}")
-                    gh_hook_do_repo.clear()
-                    st.rerun()
+                if bool(_hid) and _hurl == _url_alvo:
+                    if _cB.button("✂️ Desconectar", key=f"whd_{_r}",
+                                  use_container_width=True,
+                                  help="Remove o webhook deste repo no GitHub. "
+                                       "O push deixa de avisar na hora (sobra "
+                                       "só a ronda de 2 min)."):
+                        st.toast(f"{_r}: {gh_hook_desconectar(_r)}")
+                        gh_hook_do_repo.clear()
+                        st.rerun()
+                else:
+                    if _cB.button("🔗 Conectar", key=f"whc_{_r}", type="primary",
+                                  use_container_width=True,
+                                  help="Cria/aponta o webhook deste repo para a "
+                                       "campainha deste servidor — via API, sem "
+                                       "abrir o GitHub."):
+                        st.toast(f"{_r}: {gh_hook_sincronizar(_r)}")
+                        gh_hook_do_repo.clear()
+                        st.rerun()
 
     # popovers ⋯ compactos e uniformes (todos no tamanho MENOR)
     st.markdown("<style>div[data-testid='stPopoverBody']"
