@@ -2318,6 +2318,36 @@ elif pagina == "🐘 Supabase VPS":
                               type="primary", use_container_width=True):
                     st.session_state["bd_aberto"] = b["banco"]
                     st.rerun()
+
+        with st.expander("💾 Backups — noturno 03:30 + manual (GFS: 7 diários, "
+                         "4 semanais, 6 mensais)"):
+            _bdir = Path("/home/ubuntu/backups_pg/diario")
+            _arqs = (sorted(_bdir.glob("*"), key=lambda p: p.stat().st_mtime,
+                            reverse=True) if _bdir.exists() else [])
+            if _arqs:
+                _idade_h = (time.time() - _arqs[0].stat().st_mtime) / 3600
+                st.markdown(("🟢" if _idade_h < 26 else "🔴 ATENÇÃO")
+                            + f" último backup há **{_idade_h:.1f}h**")
+                st.dataframe(
+                    [{"arquivo": a.name,
+                      "tamanho": f"{a.stat().st_size / 1024:.0f} KB",
+                      "quando": time.strftime("%Y-%m-%d %H:%M",
+                                              time.localtime(a.stat().st_mtime))}
+                     for a in _arqs[:15]],
+                    use_container_width=True, hide_index=True, height=240)
+            else:
+                st.info("Nenhum backup ainda — instale o timer (kit no handoff) "
+                        "ou clique abaixo pro primeiro.")
+            if st.button("💾 Backup agora", type="primary"):
+                with st.spinner("Gerando backup de todos os bancos..."):
+                    _rc_bk, _out_bk = _run(
+                        ["bash", "/home/ubuntu/vps-admin/backup_pg.sh"],
+                        timeout=300)
+                (st.success if _rc_bk == 0 else st.error)(
+                    (_out_bk or "")[-500:] or "ok")
+            st.caption("Restaurar: `gunzip -c ARQUIVO.sql.gz | sudo -u postgres "
+                       "psql -d BANCO` · configs no `configs_DATA.tgz` · "
+                       "⚠️ offsite (fora do servidor) ainda pendente — na lista.")
     else:
         # ---- DRILL-DOWN: dentro do banco ----
         if st.button("← Voltar aos bancos"):
