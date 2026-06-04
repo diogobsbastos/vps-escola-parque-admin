@@ -803,6 +803,26 @@ echo "campainha instalada — volte ao painel e clique 🔁"
 """
 
 
+ROTEIRO_MIGRACAO = """
+**0️⃣ GitHub novo** *(só se mudar de conta — ex.: cliente/sócio)* — crie a conta,
+suba os repos do framework (`git push` a partir dos clones atuais) e gere um
+**token fine-grained** (Settings → Developer settings → Fine-grained tokens)
+marcando os repos do framework com permissões **Contents: Read/Write** e
+**Webhooks: Read/Write**. No servidor novo:
+`echo SEU_TOKEN > ~/.github_token && chmod 600 ~/.github_token`
+
+**1️⃣ Painel no VPS novo** — receita `SETUP_SERVIDOR.md` (clone + venv +
+systemd + Nginx + certbot). O `webhook.py` e o `criar_webhooks.sh` já vêm
+junto com o painel, via git.
+
+**2️⃣ Identidade do servidor** — crie `~/.vps_config.json`:
+`{"ip": "IP_NOVO", "dominio": "novo.duckdns.org", "github_user": "CONTA_NOVA"}`
+— o painel INTEIRO se adapta a partir desse arquivo (inclusive esta página).
+
+**3️⃣ Campainha** — cole o kit abaixo no SSH do servidor novo (1x):
+"""
+
+
 def gh_hook_desconectar(repo: str) -> str:
     hid, _, _ = gh_hook_do_repo(repo)
     if not hid:
@@ -1509,6 +1529,16 @@ elif pagina == "🌿 Git & Deploys":
             "3️⃣ clicar 🔁 — todos os repos passam a tocar a campainha nova, "
             "sem abrir o GitHub."
         )
+        if st.toggle("📦 **Roteiro completo: levar o framework pra OUTRO VPS "
+                     "/ OUTRO GitHub**", key="rot_mig"):
+            st.markdown(ROTEIRO_MIGRACAO)
+            st.code(KIT_CAMPAINHA, language="bash")
+            st.markdown(
+                "**4️⃣ Religar:** abra o painel novo → 🌿 → 🪝 → **🔁 Conectar/"
+                "atualizar TODOS**. Os webhooks são criados **na conta nova, "
+                "via API** — você não abre o site do GitHub pra nada. ✅"
+            )
+            st.divider()
         _url_alvo = webhook_url_atual()
         if not _url_alvo:
             st.warning("⚪ Campainha ainda NÃO instalada neste servidor — normal em "
