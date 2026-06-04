@@ -1316,7 +1316,12 @@ elif pagina == "🌿 Git & Deploys":
                 "{max-width:100%;}"
                 "div[data-testid='stPopover'] button svg,"
                 "div[data-testid='stPopover'] button [data-testid='stIconMaterial']"
-                "{display:none;}</style>", unsafe_allow_html=True)
+                "{display:none;}"
+                "div[data-testid='stPopover'] button"
+                "{justify-content:center;text-align:center;"
+                "padding:0.15rem 0.3rem;min-height:1.8rem;height:1.8rem;}"
+                "div[data-testid='stPopover'] button p"
+                "{margin:0;line-height:1;}</style>", unsafe_allow_html=True)
 
     estado = git_estado()
     _extras_git = git_projetos_extras()
