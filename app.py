@@ -492,6 +492,23 @@ def todos_git_projetos() -> dict:
     return {**GIT_PROJETOS, **git_projetos_extras()}
 
 
+def git_situ_curta(repo: str, conf: dict) -> str:
+    """Resumo 🟢/🟠 do sync GitHub x producao (p/ Dashboard e Aplicativos)."""
+    remoto = git_remote_head(repo)
+    local = git_estado().get(repo, {}).get("commit", "—")
+    if conf.get("pull"):
+        _, _h = _run(["git", "-C", conf["pull"], "rev-parse", "--short=10", "HEAD"])
+        if _h and "fatal" not in _h.lower():
+            local = _h.strip()
+    if remoto == "?":
+        return "🟡 GitHub?"
+    if local == "—":
+        return "⚪ sem deploy"
+    if remoto == local:
+        return "🟢 em dia"
+    return "🟠 update disponível!"
+
+
 @st.cache_data(ttl=60, show_spinner=False)
 def git_remote_head(repo: str) -> str:
     """Ultimo commit no GitHub (sem clonar). Cache 60s."""
@@ -756,6 +773,15 @@ if pagina == "📊 Dashboard":
                 st.caption(f"`{nome}` · {stt}")
 
     st.divider()
+    st.subheader("🌿 Git & Deploys")
+    _cols_g = st.columns(3)
+    for _i, (_repo, _conf) in enumerate(todos_git_projetos().items()):
+        with _cols_g[_i % 3]:
+            with st.container(border=True):
+                st.markdown(f"**{_conf.get('rotulo', _repo)}**")
+                st.caption(f"`{_repo}` · {git_situ_curta(_repo, _conf)}")
+
+    st.divider()
     rotas = rotas_nginx()
     if rotas:
         st.subheader("🌐 Acessos rapidos")
@@ -782,6 +808,12 @@ elif pagina == "🚀 Aplicativos":
     with tab_apps:
         st.caption("Ações restritas à whitelist — sem terminal livre, por segurança.")
         extras = carregar_apps_extras()
+        _git_svc: dict[str, str] = {}
+        _git_situ: dict[str, str] = {}
+        for _r, _c in todos_git_projetos().items():
+            _git_situ[_r] = git_situ_curta(_r, _c)
+            for _s in _c.get("servicos", []):
+                _git_svc[_s] = _r
         for nome, rotulo in todos_servicos().items():
             stt = status_servico(nome)
             cor = {"active": "🟢", "inactive": "⚪", "failed": "🔴"}.get(stt, "🟡")
@@ -791,7 +823,9 @@ elif pagina == "🚀 Aplicativos":
                 c1, c2, c3, c4, c5 = st.columns(
                     [3.6, 1.2, 1.2, 1.0, 1.3], vertical_alignment="center"
                 )
-                c1.markdown(f"**{cor} {rotulo}**  \n`{nome}` · status: `{stt}`")
+                _g = _git_svc.get(nome)
+                _gtxt = f" · 🌿 `{_g}` {_git_situ.get(_g, '')}" if _g else ""
+                c1.markdown(f"**{cor} {rotulo}**  \n`{nome}` · status: `{stt}`{_gtxt}")
                 if c2.button("Restart", key=f"r_{nome}", use_container_width=True):
                     ok, msg = acao_servico(nome, "restart")
                     (st.success if ok else st.error)(msg[:400])
