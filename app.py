@@ -1009,26 +1009,61 @@ def dialog_exportar() -> None:
     if not arqs:
         st.info("Nenhum arquivo local ainda — rode um backup primeiro.")
         return
-    st.caption(f"{len(arqs)} arquivos no servidor · cada execução gera "
-               "1 dump por banco (🗄️) + 1 pacote de segredos/configs do "
-               "servidor (🔐 — kit de recuperação de desastre).")
+    import math as _math
+    import re as _re
+    grupos: dict = {}
+    for a in arqs:
+        _m = _re.search(r"(\d{4}-\d{2}-\d{2}_\d{4})", a.name)
+        grupos.setdefault(_m.group(1) if _m else a.name, []).append(a)
+    chaves = sorted(grupos, reverse=True)
+    POR_PAG = 10
+    total_pag = max(1, _math.ceil(len(chaves) / POR_PAG))
+    c_cap, c_pag = st.columns([3.8, 1.2], vertical_alignment="center")
+    c_cap.caption(f"{len(chaves)} execuções guardadas · cada uma gera o dump "
+                  "do(s) banco(s) 🗄️ + o pacote de segredos 🔐 (recuperação "
+                  "de desastre).")
+    pag = (c_pag.number_input("Página", 1, total_pag, 1,
+                              label_visibility="collapsed")
+           if total_pag > 1 else 1)
     st.markdown("<style>div[data-testid='stDownloadButton'] button"
-                "{width:2.3rem;min-width:2.3rem;height:2.1rem;"
-                "min-height:2.1rem;padding:0;}</style>",
+                "{width:2.2rem;min-width:2.2rem;height:1.9rem;"
+                "min-height:1.9rem;padding:0;}</style>",
                 unsafe_allow_html=True)
-    for a in arqs[:25]:
-        with st.container(border=True):
-            _ce1, _ce2 = st.columns([5.6, 0.6], vertical_alignment="center")
-            _mt = time.localtime(a.stat().st_mtime)
-            _tipo = ("🔐 segredos & configs" if a.name.endswith(".tgz")
-                     else f"🗄️ banco **{a.name.rsplit('_', 2)[0]}**")
-            _ce1.markdown(f"<small>`{time.strftime('%d/%m/%Y %H:%M', _mt)}` · "
-                          f"{_tipo} · {max(1, a.stat().st_size // 1024)} KB"
-                          f"</small>", unsafe_allow_html=True)
-            _ce2.download_button("⬇", data=a.read_bytes(),
-                                 file_name=a.name, mime="application/gzip",
-                                 key=f"dl_{a.name}_{int(a.stat().st_mtime)}",
-                                 help=f"Baixar {a.name}")
+    for k in chaves[(int(pag) - 1) * POR_PAG: int(pag) * POR_PAG]:
+        itens = grupos[k]
+        dumps = [a for a in itens if a.name.endswith(".sql.gz")]
+        confs = [a for a in itens if a.name.endswith(".tgz")]
+        try:
+            data_br = f"{k[8:10]}/{k[5:7]}/{k[0:4]} {k[11:13]}:{k[13:15]}"
+        except Exception:
+            data_br = k
+        linhas_g = max(len(dumps), 1)
+        for i in range(linhas_g):
+            c0, c1, c2, c3, c4 = st.columns([1.2, 1.9, 0.5, 1.9, 0.5],
+                                            vertical_alignment="center")
+            if i == 0:
+                c0.markdown(f"<small>`{data_br}`</small>",
+                            unsafe_allow_html=True)
+            if i < len(dumps):
+                _a = dumps[i]
+                c1.markdown(f"<small>🗄️ **{_a.name.rsplit('_', 2)[0]}** · "
+                            f"{max(1, _a.stat().st_size // 1024)} KB</small>",
+                            unsafe_allow_html=True)
+                c2.download_button("⬇", data=_a.read_bytes(),
+                                   file_name=_a.name,
+                                   mime="application/gzip",
+                                   key=f"dl_{_a.name}",
+                                   help=f"Baixar {_a.name}")
+            if i == 0 and confs:
+                _c = confs[0]
+                c3.markdown(f"<small>🔐 segredos & configs · "
+                            f"{max(1, _c.stat().st_size // 1024)} KB</small>",
+                            unsafe_allow_html=True)
+                c4.download_button("⬇", data=_c.read_bytes(),
+                                   file_name=_c.name,
+                                   mime="application/gzip",
+                                   key=f"dl_{_c.name}",
+                                   help=f"Baixar {_c.name}")
 
 
 @st.dialog("✏️ Editar perfil de backup", width="large")
