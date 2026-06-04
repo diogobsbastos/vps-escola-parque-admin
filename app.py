@@ -1432,9 +1432,12 @@ elif pagina == "🌿 Git & Deploys":
                 "div[data-testid='stPopover'] button svg,"
                 "div[data-testid='stPopover'] button [data-testid='stIconMaterial']"
                 "{display:none;}"
+                "div[data-testid='stPopover']"
+                "{display:flex;justify-content:center;}"
                 "div[data-testid='stPopover'] button"
-                "{justify-content:center;text-align:center;"
-                "padding:0.15rem 0.3rem;min-height:1.8rem;height:1.8rem;}"
+                "{justify-content:center;text-align:center;padding:0;"
+                "width:1.9rem;min-width:1.9rem;max-width:1.9rem;"
+                "min-height:1.9rem;height:1.9rem;}"
                 "div[data-testid='stPopover'] button p"
                 "{margin:0;line-height:1;}</style>", unsafe_allow_html=True)
 
@@ -1496,7 +1499,7 @@ elif pagina == "🌿 Git & Deploys":
                         st.rerun()
                     else:
                         st.error("Deploy falhou: " + msg)
-            with cx.popover("⋯", use_container_width=True):
+            with cx.popover("⋯"):
                 st.markdown(f"**⚙️ Configurar `{repo}`**")
                 with st.form(f"edit_{repo}", border=False):
                     e_rot = st.text_input("Rótulo", value=conf.get("rotulo", repo))
