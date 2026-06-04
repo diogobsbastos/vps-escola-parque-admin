@@ -954,6 +954,37 @@ def jwt_banco(role: str, dias: int = 3650) -> str:
     return (h + b"." + p + b"." + s).decode()
 
 
+@st.dialog("🧰 Console SQL — Postgres local", width="large")
+def dialog_console_sql() -> None:
+    st.caption("Leitura liberada; escrita/DDL só com a chave 🔓 (cuidado: produção).")
+    ok_b, out_b = psql_run("select datname from pg_database "
+                           "where not datistemplate order by 1;", banco="postgres")
+    _bancos = [l["datname"] for l in csv_linhas(out_b)] if ok_b else ["innova"]
+    c_p, c_b = st.columns(2)
+    papel = c_p.selectbox("Executar como", ["admin", "worker", "app"])
+    bdsql = c_b.selectbox("Banco", _bancos)
+    q = st.text_area("SQL", height=140, placeholder="select now();")
+    escrita = st.toggle("🔓 Permitir escrita/DDL (INSERT/UPDATE/CREATE/DROP...)")
+    if st.button("▶ Executar", type="primary", use_container_width=True):
+        ql = (q or "").strip()
+        if not ql:
+            st.warning("Escreva um SQL primeiro.")
+        elif not escrita and not ql.lower().lstrip("( ").startswith(
+                ("select", "show", "explain", "with", "table ")):
+            st.error("Console em modo LEITURA — ligue 🔓 pra rodar escrita/DDL.")
+        else:
+            ok_q, out_q = psql_run(ql, banco=bdsql, papel=papel, timeout=60)
+            if ok_q:
+                ls = csv_linhas(out_q)
+                if ls:
+                    st.dataframe(ls, use_container_width=True, hide_index=True)
+                else:
+                    st.code(out_q[:2000] or "(sem saída)", language="text")
+                st.success(f"OK · {len(ls)} linha(s)")
+            else:
+                st.error(out_q[:1000])
+
+
 ROTEIRO_MIGRACAO = """
 **0️⃣ GitHub novo** *(só se mudar de conta — ex.: cliente/sócio)* — crie a conta,
 suba os repos do framework (`git push` a partir dos clones atuais) e gere um
@@ -2181,166 +2212,198 @@ elif pagina == "🧠 IA & LLMs":
 # ============================================================
 
 elif pagina == "🐘 Supabase VPS":
-    st.title("🐘 Supabase VPS")
+    c_t, c_nb, c_sq = st.columns([3.2, 1.4, 1.3], vertical_alignment="center")
+    with c_t:
+        st.title("🐘 Supabase VPS")
+    with c_nb:
+        _f_nb = bool(st.session_state.get("form_novo_banco"))
+        if st.button("✖ Fechar formulário" if _f_nb else "➕ Novo banco",
+                     type="secondary" if _f_nb else "primary",
+                     use_container_width=True):
+            st.session_state["form_novo_banco"] = not _f_nb
+            st.rerun()
+    with c_sq:
+        if st.button("🧰 Console SQL", use_container_width=True):
+            dialog_console_sql()
     st.markdown(ABAS_CSS, unsafe_allow_html=True)
     _pg_on = status_servico("postgresql") == "active"
     _api_on = status_servico("postgrest") == "active"
     st.caption(f"PostgreSQL 17 {'🟢' if _pg_on else '🔴'} · API REST (PostgREST) "
                f"{'🟢' if _api_on else '🔴'} · nosso banco com endereço e chaves, "
-               "sem mensalidade. Console, criação de bancos e ficha de conexão.")
+               "sem mensalidade. Clique num banco pra ver tabelas e chaves.")
     if not db_cred():
         st.warning("Sem ~/.innova_db.json — rode a FASE 1 do banco interno (handoff).")
-    tab_v, tab_sql, tab_con, tab_novo = st.tabs(
-        ["📊 Visão geral", "🧰 Console SQL", "🔑 Conexão & Chaves", "➕ Novo banco"])
 
-    with tab_v:
-        ok_b, out_b = psql_run(
-            "select d.datname as banco, pg_get_userbyid(d.datdba) as dono, "
-            "pg_size_pretty(pg_database_size(d.datname)) as tamanho "
-            "from pg_database d where not d.datistemplate order by 1;",
-            banco="postgres")
-        _bancos = [l["banco"] for l in csv_linhas(out_b)] if ok_b else ["innova"]
-        if ok_b:
-            st.markdown("##### 🗄️ Bancos")
-            st.dataframe(csv_linhas(out_b), use_container_width=True, hide_index=True)
-        else:
-            st.error(out_b[:400])
-        _b_sel = st.selectbox("Ver tabelas do banco", _bancos,
-                              index=_bancos.index("innova") if "innova" in _bancos else 0)
-        ok_t, out_t = psql_run(
-            "select c.relname as tabela, "
-            "pg_size_pretty(pg_total_relation_size(c.oid)) as tamanho, "
-            "coalesce(s.n_live_tup,0) as linhas from pg_class c "
-            "join pg_namespace n on n.oid=c.relnamespace "
-            "left join pg_stat_user_tables s on s.relid=c.oid "
-            "where n.nspname='public' and c.relkind='r' "
-            "order by pg_total_relation_size(c.oid) desc;", banco=_b_sel)
-        if ok_t:
-            _ts = csv_linhas(out_t)
-            st.markdown(f"##### 📋 Tabelas de `{_b_sel}` ({len(_ts)})")
-            if _ts:
-                st.dataframe(_ts, use_container_width=True, hide_index=True,
-                             height=min(300, 60 + 35 * len(_ts)))
-            else:
-                st.info("Banco ainda sem tabelas — o schema do Innova chega na "
-                        "FASE 3 da migração (Drizzle).")
-        c_u, c_e = st.columns(2)
-        ok_u, out_u = psql_run(
-            "select rolname as papel, rolcanlogin as faz_login, "
-            "rolcreatedb as cria_banco from pg_roles "
-            "where rolname not like 'pg\_%' order by 1;", banco="postgres")
-        if ok_u:
-            c_u.markdown("##### 👤 Usuários / papéis")
-            c_u.dataframe(csv_linhas(out_u), use_container_width=True, hide_index=True)
-        ok_e, out_e = psql_run("select extname as extensao, extversion as versao "
-                               "from pg_extension order by 1;", banco=_b_sel)
-        if ok_e:
-            c_e.markdown("##### 🧩 Extensões")
-            c_e.dataframe(csv_linhas(out_e), use_container_width=True, hide_index=True)
-
-    with tab_sql:
-        st.caption("Console direto no Postgres local. Leitura liberada; escrita/DDL "
-                   "só com a chave ligada (cuidado: produção).")
-        c_p, c_b = st.columns(2)
-        _papel = c_p.selectbox("Executar como", ["admin", "worker", "app"])
-        _bdsql = c_b.selectbox("Banco", _bancos if _bancos else ["innova"])
-        _q = st.text_area("SQL", height=140, placeholder="select now();")
-        _escrita = st.toggle("🔓 Permitir escrita/DDL (INSERT/UPDATE/CREATE/DROP...)")
-        if st.button("▶ Executar", type="primary"):
-            _ql = (_q or "").strip()
-            if not _ql:
-                st.warning("Escreva um SQL primeiro.")
-            elif not _escrita and not _ql.lower().lstrip("( ").startswith(
-                    ("select", "show", "explain", "with", "table ")):
-                st.error("Console em modo LEITURA — ligue 🔓 pra rodar escrita/DDL.")
-            else:
-                ok_q, out_q = psql_run(_ql, banco=_bdsql, papel=_papel, timeout=60)
-                if ok_q:
-                    _ls = csv_linhas(out_q)
-                    if _ls:
-                        st.dataframe(_ls, use_container_width=True, hide_index=True)
-                    else:
-                        st.code(out_q[:2000] or "(sem saída)", language="text")
-                    st.success(f"OK · {len(_ls)} linha(s)")
+    if st.session_state.get("form_novo_banco"):
+        with st.container(border=True):
+            st.markdown("**Criar um banco novo no Postgres local** (com pgvector; "
+                        "opcionalmente um usuário dono próprio).")
+            with st.form("novo_bd", border=False):
+                f1, f2 = st.columns(2)
+                nb = f1.text_input("Nome do banco", placeholder="meu_app")
+                nu = f2.text_input("Usuário dono (opcional — vazio usa innova_app)",
+                                   placeholder="meu_app_user")
+                okb = st.form_submit_button("➕ Criar banco", type="primary")
+            if okb:
+                import re as _re
+                import secrets as _secrets
+                nome_b = (nb or "").strip().lower()
+                if not _re.fullmatch(r"[a-z_][a-z0-9_]{1,40}", nome_b):
+                    st.error("Nome inválido — minúsculas, números e _ "
+                             "(começando por letra).")
                 else:
-                    st.error(out_q[:1000])
-
-    with tab_con:
-        st.caption("A ficha do nosso 'Supabase' — pra registrar em qualquer app "
-                   "(Multi-Pool do Escola Parque, apps externos etc.). As chaves "
-                   "são geradas do segredo local; nada sai do servidor.")
-        cred = db_cred()
-        _w, _a = cred.get("worker", {}), cred.get("app", {})
-        _anon, _serv = jwt_banco("anon"), jwt_banco("service_role")
-        if not _anon:
-            st.warning("Segredo do PostgREST não encontrado "
-                       "(~/.postgrest_jwt_secret) — rode a FASE 2.5.")
-        else:
-            st.code(
-                f"Label        : 🏠 VPS Interno (local)\n"
-                f"Supabase URL : {URL_BASE}\n"
-                f"Project ID   : vps-interno\n"
-                f"Region       : vps-local\n"
-                f"Anon Key     : {_anon}\n"
-                f"Service Key  : {_serv}\n"
-                f"DB Password  : {_w.get('pass', '?')}\n"
-                f"Database URL : postgres://{_w.get('user', '?')}:"
-                f"{_w.get('pass', '?')}@127.0.0.1:5432/innova\n"
-                f"App (Drizzle): postgres://{_a.get('user', '?')}:"
-                f"{_a.get('pass', '?')}@127.0.0.1:5432/innova",
-                language="text")
-            st.caption("REST: `GET " + URL_BASE + "/rest/v1/<tabela>` com headers "
-                       "`apikey` e `Authorization: Bearer <key>` — compatível com "
-                       "clientes Supabase. ⚠️ Esta aba mostra segredos (painel logado).")
-        st.markdown(f"<small>🔌 Do SEU PC (dev): túnel "
-                    f"<code>ssh -i CHAVE -L 5432:127.0.0.1:5432 ubuntu@{IP_PUBLICO}</code> "
-                    f"e conecte em <code>localhost:5432</code>. Banco NÃO é exposto "
-                    f"direto na internet (segurança).</small>", unsafe_allow_html=True)
-
-    with tab_novo:
-        st.caption("Cria um banco novo no Postgres local — estilo cPanel. "
-                   "Opcionalmente com usuário dono próprio (senha gerada na hora).")
-        with st.form("novo_bd"):
-            nb = st.text_input("Nome do banco", placeholder="meu_app")
-            nu = st.text_input("Usuário dono (opcional — vazio usa innova_app)",
-                               placeholder="meu_app_user")
-            okb = st.form_submit_button("➕ Criar banco", type="primary")
-        if okb:
-            import re as _re
-            import secrets as _secrets
-            nome_b = (nb or "").strip().lower()
-            if not _re.fullmatch(r"[a-z_][a-z0-9_]{1,40}", nome_b):
-                st.error("Nome inválido — use minúsculas, números e _ (começando "
-                         "por letra).")
-            else:
-                dono, senha_nova, errs = "innova_app", "", []
-                if (nu or "").strip():
-                    dono = nu.strip().lower()
-                    if not _re.fullmatch(r"[a-z_][a-z0-9_]{1,40}", dono):
-                        errs.append("nome de usuário inválido")
-                    else:
-                        senha_nova = _secrets.token_hex(12)
-                        ok_r, out_r = psql_run(
-                            f"create role {dono} login password '{senha_nova}';",
+                    dono, senha_nova, errs = "innova_app", "", []
+                    if (nu or "").strip():
+                        dono = nu.strip().lower()
+                        if not _re.fullmatch(r"[a-z_][a-z0-9_]{1,40}", dono):
+                            errs.append("nome de usuário inválido")
+                        else:
+                            senha_nova = _secrets.token_hex(12)
+                            ok_r, out_r = psql_run(
+                                f"create role {dono} login password "
+                                f"'{senha_nova}';", banco="postgres")
+                            if not ok_r:
+                                errs.append(out_r[:300])
+                    if not errs:
+                        ok_c, out_c = psql_run(
+                            f"create database {nome_b} owner {dono};",
                             banco="postgres")
-                        if not ok_r:
-                            errs.append(out_r[:300])
-                if not errs:
-                    ok_c, out_c = psql_run(
-                        f"create database {nome_b} owner {dono};", banco="postgres")
-                    if not ok_c:
-                        errs.append(out_c[:300])
-                if errs:
-                    st.error(" | ".join(errs))
+                        if not ok_c:
+                            errs.append(out_c[:300])
+                    if errs:
+                        st.error(" | ".join(errs))
+                    else:
+                        ok_x, _sx = psql_run(
+                            "create extension if not exists vector;", banco=nome_b)
+                        st.success(f"✅ Banco `{nome_b}` criado (dono `{dono}`"
+                                   + (", pgvector ativado" if ok_x else "") + ").")
+                        if senha_nova:
+                            st.code(f"postgres://{dono}:{senha_nova}"
+                                    f"@127.0.0.1:5432/{nome_b}", language="text")
+                            st.caption("⚠️ Guarde a senha — mostrada SÓ agora.")
+
+    ok_b, out_b = psql_run(
+        "select d.datname as banco, pg_get_userbyid(d.datdba) as dono, "
+        "pg_size_pretty(pg_database_size(d.datname)) as tamanho "
+        "from pg_database d where not d.datistemplate order by 1;",
+        banco="postgres")
+    _lista_b = csv_linhas(out_b) if ok_b else []
+    if not ok_b:
+        st.error(out_b[:400])
+
+    _bd_sel = st.session_state.get("bd_aberto")
+    if _bd_sel and _bd_sel not in [b["banco"] for b in _lista_b]:
+        _bd_sel = None
+        st.session_state.pop("bd_aberto", None)
+
+    if not _bd_sel:
+        # ---- LISTA: um card por banco (estilo projetos do Git & Deploys) ----
+        for b in _lista_b:
+            with st.container(border=True):
+                cb1, cb2 = st.columns([4.4, 1.3], vertical_alignment="center")
+                _eh_innova = b["banco"] == "innova"
+                cb1.markdown(
+                    f"**🗄️ {b['banco']}**"
+                    + (" · 🏠 banco do sistema (Innova/Escola Parque)"
+                       if _eh_innova else "")
+                    + f"  \n<small>dono `{b['dono']}` · {b['tamanho']}"
+                    + (" · API REST /rest/v1 ativa" if _eh_innova else
+                       " · acesso direto 5432") + "</small>",
+                    unsafe_allow_html=True,
+                )
+                if cb2.button("Abrir 🗄️", key=f"abrir_{b['banco']}",
+                              type="primary", use_container_width=True):
+                    st.session_state["bd_aberto"] = b["banco"]
+                    st.rerun()
+    else:
+        # ---- DRILL-DOWN: dentro do banco ----
+        if st.button("← Voltar aos bancos"):
+            st.session_state.pop("bd_aberto", None)
+            st.rerun()
+        _info_b = next((b for b in _lista_b if b["banco"] == _bd_sel), {})
+        st.subheader(f"🗄️ {_bd_sel} — {_info_b.get('tamanho', '?')} · "
+                     f"dono `{_info_b.get('dono', '?')}`")
+        t_tab, t_chave, t_adm = st.tabs(
+            ["📋 Tabelas", "🔑 Conexão & Chaves", "👤 Usuários & Extensões"])
+
+        with t_tab:
+            ok_t, out_t = psql_run(
+                "select c.relname as tabela, "
+                "pg_size_pretty(pg_total_relation_size(c.oid)) as tamanho, "
+                "coalesce(s.n_live_tup,0) as linhas from pg_class c "
+                "join pg_namespace n on n.oid=c.relnamespace "
+                "left join pg_stat_user_tables s on s.relid=c.oid "
+                "where n.nspname='public' and c.relkind='r' "
+                "order by pg_total_relation_size(c.oid) desc;", banco=_bd_sel)
+            _ts = csv_linhas(out_t) if ok_t else []
+            if not ok_t:
+                st.error(out_t[:400])
+            elif _ts:
+                st.dataframe(_ts, use_container_width=True, hide_index=True,
+                             height=min(420, 60 + 35 * len(_ts)))
+            else:
+                st.info("Banco ainda sem tabelas"
+                        + (" — o schema do Innova chega na FASE 3 da migração "
+                           "(Drizzle)." if _bd_sel == "innova" else "."))
+
+        with t_chave:
+            cred = db_cred()
+            _w, _a = cred.get("worker", {}), cred.get("app", {})
+            if _bd_sel == "innova":
+                _anon, _serv = jwt_banco("anon"), jwt_banco("service_role")
+                if not _anon:
+                    st.warning("Segredo do PostgREST não encontrado "
+                               "(~/.postgrest_jwt_secret) — FASE 2.5.")
                 else:
-                    ok_x, _sx = psql_run("create extension if not exists vector;",
-                                         banco=nome_b)
-                    st.success(f"✅ Banco `{nome_b}` criado (dono `{dono}`"
-                               + (", pgvector ativado" if ok_x else "") + ").")
-                    if senha_nova:
-                        st.code(f"postgres://{dono}:{senha_nova}@127.0.0.1:5432/"
-                                f"{nome_b}", language="text")
-                        st.caption("⚠️ Guarde a senha — ela é mostrada SÓ agora.")
+                    st.caption("Ficha pro Multi-Pool / apps externos — formato "
+                               "Supabase. ⚠️ mostra segredos (painel logado).")
+                    st.code(
+                        f"Label        : 🏠 VPS Interno (local)\n"
+                        f"Supabase URL : {URL_BASE}\n"
+                        f"Project ID   : vps-interno\n"
+                        f"Region       : vps-local\n"
+                        f"Anon Key     : {_anon}\n"
+                        f"Service Key  : {_serv}\n"
+                        f"DB Password  : {_w.get('pass', '?')}\n"
+                        f"Database URL : postgres://{_w.get('user', '?')}:"
+                        f"{_w.get('pass', '?')}@127.0.0.1:5432/innova\n"
+                        f"App (Drizzle): postgres://{_a.get('user', '?')}:"
+                        f"{_a.get('pass', '?')}@127.0.0.1:5432/innova",
+                        language="text")
+                    st.caption(f"REST: `GET {URL_BASE}/rest/v1/<tabela>` com "
+                               "headers `apikey` + `Authorization: Bearer <key>`.")
+            else:
+                st.caption("Banco sem API REST (a /rest/v1 serve o `innova`). "
+                           "Acesso direto na porta local 5432:")
+                st.code(f"postgres://SEU_USUARIO:SENHA@127.0.0.1:5432/{_bd_sel}",
+                        language="text")
+                st.markdown("<small>O usuário/senha são os criados junto com o "
+                            "banco (➕ Novo banco) — senha mostrada na criação. "
+                            "Apps no próprio servidor usam direto; do seu PC, "
+                            "túnel SSH.</small>", unsafe_allow_html=True)
+            st.markdown(f"<small>🔌 Do SEU PC (dev): "
+                        f"<code>ssh -i CHAVE -L 5432:127.0.0.1:5432 "
+                        f"ubuntu@{IP_PUBLICO}</code> e conecte em "
+                        f"<code>localhost:5432</code>.</small>",
+                        unsafe_allow_html=True)
+
+        with t_adm:
+            c_u, c_e = st.columns(2)
+            ok_u, out_u = psql_run(
+                "select rolname as papel, rolcanlogin as faz_login, "
+                "rolcreatedb as cria_banco from pg_roles "
+                "where rolname not like 'pg\\_%' order by 1;", banco="postgres")
+            if ok_u:
+                c_u.markdown("##### 👤 Usuários / papéis")
+                c_u.dataframe(csv_linhas(out_u), use_container_width=True,
+                              hide_index=True)
+            ok_e, out_e = psql_run("select extname as extensao, extversion as "
+                                   "versao from pg_extension order by 1;",
+                                   banco=_bd_sel)
+            if ok_e:
+                c_e.markdown("##### 🧩 Extensões")
+                c_e.dataframe(csv_linhas(out_e), use_container_width=True,
+                              hide_index=True)
 
 
 # ============================================================
