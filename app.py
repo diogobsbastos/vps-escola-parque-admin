@@ -510,6 +510,22 @@ def git_situ_curta(repo: str, conf: dict) -> str:
     return "🟠 update disponível!"
 
 
+def autodeploy_proximo() -> int | None:
+    """Segundos ate a proxima ronda do vigia (None = timer nao instalado)."""
+    rc, out = _run(["systemctl", "show", "vpsautodeploy.timer",
+                    "-p", "NextElapseUSecRealtime", "--value"], timeout=5)
+    out = (out or "").strip()
+    if rc != 0 or not out or out in ("n/a", "infinity"):
+        return None
+    from datetime import datetime
+    try:
+        partes = out.split()  # ex.: ['Thu', '2026-06-04', '04:02:48', '-03']
+        alvo = datetime.strptime(partes[1] + " " + partes[2], "%Y-%m-%d %H:%M:%S")
+        return max(0, int((alvo - datetime.now()).total_seconds()))
+    except Exception:
+        return None
+
+
 @st.cache_data(ttl=60, show_spinner=False)
 def git_remote_head(repo: str) -> str:
     """Ultimo commit no GitHub (sem clonar). Cache 60s."""
@@ -1044,6 +1060,21 @@ elif pagina == "🌿 Git & Deploys":
         "pastas de produção (sem tocar nos venvs) e reinicia os serviços do projeto. "
         "Histórico e rollback ficam no GitHub."
     )
+
+    @st.fragment(run_every=2)
+    def _cronometro_vigia():
+        seg = autodeploy_proximo()
+        if seg is None:
+            st.caption("🕐 Vigia auto-deploy: timer não instalado no servidor.")
+            return
+        m, s2 = divmod(int(seg), 60)
+        c_cr1, c_cr2 = st.columns([1.6, 4], vertical_alignment="center")
+        c_cr1.markdown(f"### 🕐 `{m:02d}:{s2:02d}`")
+        c_cr2.progress(max(0.0, min(1.0, 1 - seg / 120)),
+                       text="próxima ronda do vigia — projetos com ⚙️ auto ligado "
+                            "são atualizados se houver commit novo no GitHub")
+    _cronometro_vigia()
+
     estado = git_estado()
     _extras_git = git_projetos_extras()
     for repo, conf in todos_git_projetos().items():
