@@ -1313,7 +1313,10 @@ elif pagina == "🌿 Git & Deploys":
     st.markdown("<style>div[data-testid='stPopoverBody']"
                 "{width:min(380px,92vw);min-width:0;}"
                 "div[data-testid='stPopoverBody'] [data-testid='stVerticalBlock']"
-                "{max-width:100%;}</style>", unsafe_allow_html=True)
+                "{max-width:100%;}"
+                "div[data-testid='stPopover'] button svg,"
+                "div[data-testid='stPopover'] button [data-testid='stIconMaterial']"
+                "{display:none;}</style>", unsafe_allow_html=True)
 
     estado = git_estado()
     _extras_git = git_projetos_extras()
