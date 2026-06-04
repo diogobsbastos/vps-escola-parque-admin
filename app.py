@@ -2003,6 +2003,12 @@ elif pagina == "💾 Servidor & Limites":
     with st.container(border=True):
         _val = cert_validade(DOMINIO)
         c_id, c_mig = st.columns([4, 1.4], vertical_alignment="center")
+        c_mig.link_button(
+            "🔶 Abrir na Oracle", 
+            "https://cloud.oracle.com/compute/instances?region=sa-saopaulo-1",
+            use_container_width=True,
+            help="Console da Oracle Cloud — a instância escola-parque-v3 ao vivo "
+                 "(tenancy tecnicoeurio, Always Free).")
         c_id.markdown(
             f"**Domínio:** [`{DOMINIO}`]({URL_BASE}) · **IP:** `{IP_PUBLICO}`  \n"
             f"🔒 **HTTPS Let's Encrypt** — "
