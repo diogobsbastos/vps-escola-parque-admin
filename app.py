@@ -1462,15 +1462,15 @@ elif pagina == "🌿 Git & Deploys":
                 "div[data-testid='stPopover']"
                 "{display:flex;justify-content:center;}"
                 "div[data-testid='stPopover'] button"
-                "{display:inline-flex;align-items:center;justify-content:center;"
-                "padding:0;width:2.1rem;min-width:2.1rem;max-width:2.1rem;"
+                "{position:relative;padding:0;overflow:hidden;"
+                "width:2.1rem;min-width:2.1rem;max-width:2.1rem;"
                 "min-height:2.1rem;height:2.1rem;border-radius:0.5rem;}"
-                "div[data-testid='stPopover'] button > div"
-                "{margin:0;padding:0;display:flex;align-items:center;"
-                "justify-content:center;width:100%;}"
+                "div[data-testid='stPopover'] button *"
+                "{margin:0;padding:0;}"
                 "div[data-testid='stPopover'] button p"
-                "{margin:0;padding:0;line-height:1;font-size:1rem;"
-                "text-align:center;width:100%;}</style>",
+                "{position:absolute;top:50%;left:50%;"
+                "transform:translate(-50%,-50%);line-height:1;"
+                "font-size:1.05rem;}</style>",
                 unsafe_allow_html=True)
 
     estado = git_estado()
