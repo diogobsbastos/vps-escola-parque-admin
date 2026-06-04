@@ -456,6 +456,7 @@ GIT_PROJETOS: dict[str, dict] = {
         "mapa": {
             "app.py": "/home/ubuntu/vps-admin/app.py",
             "requirements.txt": "/home/ubuntu/vps-admin/requirements.txt",
+            "autodeploy.py": "/home/ubuntu/vps-admin/autodeploy.py",
             "llm_gateway/": "/home/ubuntu/llm-gateway/",
             "vps_mcp/": "/home/ubuntu/vps-mcp/",
         },
@@ -1061,12 +1062,24 @@ elif pagina == "🌿 Git & Deploys":
                 situ = "🟢 em dia com o GitHub"
             else:
                 situ = "🟠 atualização disponível!"
-            c1, c2, c3 = st.columns([3.8, 1.4, 1.3], vertical_alignment="center")
+            c1, c0, c2, c3 = st.columns([3.3, 0.9, 1.3, 1.3],
+                                        vertical_alignment="center")
             c1.markdown(
                 f"**{conf['rotulo']}**  \n"
                 f"`{repo}` · GitHub `{remoto}` · produção `{local}` "
-                f"({info.get('quando', 'nunca')}) · {situ}"
+                f"({info.get('quando', 'nunca')})  \n"
+                f"{situ}"
             )
+            _auto_atual = bool(conf.get("auto"))
+            _auto = c0.toggle("⚙️ auto", value=_auto_atual, key=f"auto_{repo}",
+                              help="Auto-deploy: o servidor confere o GitHub a cada 2 min "
+                                   "e aplica sozinho (push = deploy, sem clicar em nada). "
+                                   "Requer o timer vpsautodeploy instalado.")
+            if _auto != _auto_atual:
+                _ex = git_projetos_extras()
+                _ex[repo] = {**conf, "auto": _auto}
+                salvar_git_projetos(_ex)
+                st.rerun()
             c2.link_button("Ver repo", f"https://github.com/{GIT_USER}/{repo}",
                            use_container_width=True)
             if c3.button("↻ Atualizar", key=f"dep_{repo}", type="primary",
