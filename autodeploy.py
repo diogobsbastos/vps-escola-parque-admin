@@ -30,6 +30,21 @@ HIST = Path.home() / ".vps_git_historico.json"
 ADIAR_MAX = 1800  # 30 min: limite do adiamento do restart do painel
 
 
+def hist_add(repo: str, commit: str, status: str) -> None:
+    """Registra a tentativa de deploy (sucesso OU falha) no historico do painel."""
+    try:
+        hist = json.loads(HIST.read_text()) if HIST.exists() else []
+    except Exception:
+        hist = []
+    hist.append({"repo": repo, "commit": commit,
+                 "quando": time.strftime("%Y-%m-%d %H:%M"),
+                 "origem": "auto (vigia/webhook)", "status": status})
+    try:
+        HIST.write_text(json.dumps(hist[-100:], ensure_ascii=False, indent=1))
+    except Exception:
+        pass
+
+
 def run(cmd: list[str], t: int = 180) -> tuple[int, str]:
     try:
         p = subprocess.run(cmd, capture_output=True, text=True, timeout=t)
@@ -88,11 +103,15 @@ def main() -> None:
                              "pull", "--ff-only"])
             if rc2 != 0:
                 print(f"{repo}: pull falhou: {out2[-200:]}")
+                hist_add(repo, remoto[:10], "❌ pull falhou")
                 continue
             if conf.get("build"):
+                print(f"{repo}: build começou ({conf['build']})...")
                 rc3, out3 = run(["bash", "-c", f"cd {pasta} && " + conf["build"]], 900)
                 if rc3 != 0:
                     print(f"{repo}: BUILD falhou, NADA reiniciado: {out3[-200:]}")
+                    hist_add(repo, remoto[:10],
+                             "❌ build falhou — produção segue na versão anterior")
                     continue
         else:
             try:
@@ -107,6 +126,7 @@ def main() -> None:
                              "--depth", "1", f"https://github.com/{user}/{repo}.git", tmp])
             if rc2 != 0:
                 print(f"{repo}: clone falhou: {out2[-200:]}")
+                hist_add(repo, remoto[:10], "❌ clone falhou")
                 continue
             for origem, destino in conf.get("mapa", {}).items():
                 src, dst = Path(tmp) / origem.rstrip("/"), Path(destino)
@@ -128,17 +148,7 @@ def main() -> None:
         est[repo] = {"commit": remoto[:10],
                      "quando": time.strftime("%Y-%m-%d %H:%M") + " (auto)"}
         STATE.write_text(json.dumps(est, indent=2))
-        try:
-            hist = json.loads(HIST.read_text()) if HIST.exists() else []
-        except Exception:
-            hist = []
-        hist.append({"repo": repo, "commit": remoto[:10],
-                     "quando": time.strftime("%Y-%m-%d %H:%M"),
-                     "origem": "auto (vigia/webhook)"})
-        try:
-            HIST.write_text(json.dumps(hist[-100:], ensure_ascii=False, indent=1))
-        except Exception:
-            pass
+        hist_add(repo, remoto[:10], "✅ ok")
         reiniciar_servicos(conf.get("servicos", []))
         print(f"{repo}: deploy automatico {remoto[:10]} OK")
 

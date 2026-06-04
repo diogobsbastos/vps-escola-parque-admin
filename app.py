@@ -660,7 +660,8 @@ def git_hist_add(repo: str, commit: str, origem: str) -> None:
     except Exception:
         hist = []
     hist.append({"repo": repo, "commit": commit,
-                 "quando": time.strftime("%Y-%m-%d %H:%M"), "origem": origem})
+                 "quando": time.strftime("%Y-%m-%d %H:%M"), "origem": origem,
+                 "status": "✅ ok"})
     try:
         GIT_HIST_PATH.write_text(json.dumps(hist[-100:], ensure_ascii=False, indent=1))
     except Exception:
@@ -1585,6 +1586,10 @@ elif pagina == "🌿 Git & Deploys":
             st.markdown("### 🔨 Deploy em andamento")
             st.progress(1.0, text="o vigia está aplicando (pull/build/restart) — "
                                   "esta faixa volta ao normal quando ele terminar")
+            _rc_j, _out_j = _run(["journalctl", "-u", "vpsautodeploy", "-n", "14",
+                                  "--no-pager", "-o", "cat"], timeout=5)
+            if _rc_j == 0 and _out_j:
+                st.code(_out_j[-1600:], language="text")
             return
         hook_on = webhook_ativo()
         ultimo = webhook_ultimo_push()
@@ -1739,7 +1744,9 @@ elif pagina == "🌿 Git & Deploys":
                                 key="hist_filtro", label_visibility="collapsed")
             _dados_h = [
                 {"quando": e.get("quando", "?"), "projeto": e.get("repo", "?"),
-                 "commit": e.get("commit", "?"), "origem": e.get("origem", "?")}
+                 "commit": e.get("commit", "?"),
+                 "status": e.get("status", "✅ ok"),
+                 "origem": e.get("origem", "?")}
                 for e in reversed(hist)
                 if _f_h == "📁 todos os projetos" or e.get("repo") == _f_h
             ]
