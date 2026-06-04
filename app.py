@@ -2234,254 +2234,317 @@ elif pagina == "🐘 Supabase VPS":
     if not db_cred():
         st.warning("Sem ~/.innova_db.json — rode a FASE 1 do banco interno (handoff).")
 
-    if st.session_state.get("form_novo_banco"):
-        with st.container(border=True):
-            st.markdown("**Criar um banco novo no Postgres local** (com pgvector; "
-                        "opcionalmente um usuário dono próprio).")
-            with st.form("novo_bd", border=False):
-                f1, f2 = st.columns(2)
-                nb = f1.text_input("Nome do banco", placeholder="meu_app")
-                nu = f2.text_input("Usuário dono (opcional — vazio usa innova_app)",
-                                   placeholder="meu_app_user")
-                okb = st.form_submit_button("➕ Criar banco", type="primary")
-            if okb:
-                import re as _re
-                import secrets as _secrets
-                nome_b = (nb or "").strip().lower()
-                if not _re.fullmatch(r"[a-z_][a-z0-9_]{1,40}", nome_b):
-                    st.error("Nome inválido — minúsculas, números e _ "
-                             "(começando por letra).")
-                else:
-                    dono, senha_nova, errs = "innova_app", "", []
-                    if (nu or "").strip():
-                        dono = nu.strip().lower()
-                        if not _re.fullmatch(r"[a-z_][a-z0-9_]{1,40}", dono):
-                            errs.append("nome de usuário inválido")
-                        else:
-                            senha_nova = _secrets.token_hex(12)
-                            ok_r, out_r = psql_run(
-                                f"create role {dono} login password "
-                                f"'{senha_nova}';", banco="postgres")
-                            if not ok_r:
-                                errs.append(out_r[:300])
-                    if not errs:
-                        ok_c, out_c = psql_run(
-                            f"create database {nome_b} owner {dono};",
-                            banco="postgres")
-                        if not ok_c:
-                            errs.append(out_c[:300])
-                    if errs:
-                        st.error(" | ".join(errs))
-                    else:
-                        ok_x, _sx = psql_run(
-                            "create extension if not exists vector;", banco=nome_b)
-                        st.success(f"✅ Banco `{nome_b}` criado (dono `{dono}`"
-                                   + (", pgvector ativado" if ok_x else "") + ").")
-                        if senha_nova:
-                            st.code(f"postgres://{dono}:{senha_nova}"
-                                    f"@127.0.0.1:5432/{nome_b}", language="text")
-                            st.caption("⚠️ Guarde a senha — mostrada SÓ agora.")
-
-    ok_b, out_b = psql_run(
-        "select d.datname as banco, pg_get_userbyid(d.datdba) as dono, "
-        "pg_size_pretty(pg_database_size(d.datname)) as tamanho "
-        "from pg_database d where not d.datistemplate order by 1;",
-        banco="postgres")
-    _lista_b = csv_linhas(out_b) if ok_b else []
-    if not ok_b:
-        st.error(out_b[:400])
-
-    _bd_sel = st.session_state.get("bd_aberto")
-    if _bd_sel and _bd_sel not in [b["banco"] for b in _lista_b]:
-        _bd_sel = None
-        st.session_state.pop("bd_aberto", None)
-
-    if not _bd_sel:
-        # ---- LISTA: um card por banco (estilo projetos do Git & Deploys) ----
-        for b in _lista_b:
+    tab_bd, tab_bk = st.tabs(["🗄️ Banco de Dados", "💾 Backups"])
+    with tab_bd:
+        if st.session_state.get("form_novo_banco"):
             with st.container(border=True):
-                cb1, cb2 = st.columns([4.4, 1.3], vertical_alignment="center")
-                _eh_innova = b["banco"] == "innova"
-                _eh_adm = b["banco"] == "postgres"
-                cb1.markdown(
-                    f"**{'⚙️' if _eh_adm else '🗄️'} {b['banco']}**"
-                    + (" · 🏠 banco do sistema (Innova/Escola Parque)"
-                       if _eh_innova else "")
-                    + (" · banco administrativo do motor (vem de fábrica — "
-                       "não usar pra dados)" if _eh_adm else "")
-                    + f"  \n<small>dono `{b['dono']}` · {b['tamanho']}"
-                    + (" · API REST /rest/v1 ativa" if _eh_innova else
-                       ("" if _eh_adm else " · acesso direto 5432")) + "</small>",
-                    unsafe_allow_html=True,
-                )
-                if cb2.button("Abrir 🗄️", key=f"abrir_{b['banco']}",
-                              type="primary", use_container_width=True):
-                    st.session_state["bd_aberto"] = b["banco"]
-                    st.rerun()
+                st.markdown("**Criar um banco novo no Postgres local** (com pgvector; "
+                            "opcionalmente um usuário dono próprio).")
+                with st.form("novo_bd", border=False):
+                    f1, f2 = st.columns(2)
+                    nb = f1.text_input("Nome do banco", placeholder="meu_app")
+                    nu = f2.text_input("Usuário dono (opcional — vazio usa innova_app)",
+                                       placeholder="meu_app_user")
+                    okb = st.form_submit_button("➕ Criar banco", type="primary")
+                if okb:
+                    import re as _re
+                    import secrets as _secrets
+                    nome_b = (nb or "").strip().lower()
+                    if not _re.fullmatch(r"[a-z_][a-z0-9_]{1,40}", nome_b):
+                        st.error("Nome inválido — minúsculas, números e _ "
+                                 "(começando por letra).")
+                    else:
+                        dono, senha_nova, errs = "innova_app", "", []
+                        if (nu or "").strip():
+                            dono = nu.strip().lower()
+                            if not _re.fullmatch(r"[a-z_][a-z0-9_]{1,40}", dono):
+                                errs.append("nome de usuário inválido")
+                            else:
+                                senha_nova = _secrets.token_hex(12)
+                                ok_r, out_r = psql_run(
+                                    f"create role {dono} login password "
+                                    f"'{senha_nova}';", banco="postgres")
+                                if not ok_r:
+                                    errs.append(out_r[:300])
+                        if not errs:
+                            ok_c, out_c = psql_run(
+                                f"create database {nome_b} owner {dono};",
+                                banco="postgres")
+                            if not ok_c:
+                                errs.append(out_c[:300])
+                        if errs:
+                            st.error(" | ".join(errs))
+                        else:
+                            ok_x, _sx = psql_run(
+                                "create extension if not exists vector;", banco=nome_b)
+                            st.success(f"✅ Banco `{nome_b}` criado (dono `{dono}`"
+                                       + (", pgvector ativado" if ok_x else "") + ").")
+                            if senha_nova:
+                                st.code(f"postgres://{dono}:{senha_nova}"
+                                        f"@127.0.0.1:5432/{nome_b}", language="text")
+                                st.caption("⚠️ Guarde a senha — mostrada SÓ agora.")
 
-        with st.expander("💾 Backups — sistema inteligente (GFS 7/4/6 + envio externo)"):
-            BK_CFG = Path.home() / ".vps_backup.json"
+        ok_b, out_b = psql_run(
+            "select d.datname as banco, pg_get_userbyid(d.datdba) as dono, "
+            "pg_size_pretty(pg_database_size(d.datname)) as tamanho "
+            "from pg_database d where not d.datistemplate order by 1;",
+            banco="postgres")
+        _lista_b = csv_linhas(out_b) if ok_b else []
+        if not ok_b:
+            st.error(out_b[:400])
+
+        _bd_sel = st.session_state.get("bd_aberto")
+        if _bd_sel and _bd_sel not in [b["banco"] for b in _lista_b]:
+            _bd_sel = None
+            st.session_state.pop("bd_aberto", None)
+
+        if not _bd_sel:
+            # ---- LISTA: um card por banco (estilo projetos do Git & Deploys) ----
+            for b in _lista_b:
+                with st.container(border=True):
+                    cb1, cb2 = st.columns([4.4, 1.3], vertical_alignment="center")
+                    _eh_innova = b["banco"] == "innova"
+                    _eh_adm = b["banco"] == "postgres"
+                    cb1.markdown(
+                        f"**{'⚙️' if _eh_adm else '🗄️'} {b['banco']}**"
+                        + (" · 🏠 banco do sistema (Innova/Escola Parque)"
+                           if _eh_innova else "")
+                        + (" · banco administrativo do motor (vem de fábrica — "
+                           "não usar pra dados)" if _eh_adm else "")
+                        + f"  \n<small>dono `{b['dono']}` · {b['tamanho']}"
+                        + (" · API REST /rest/v1 ativa" if _eh_innova else
+                           ("" if _eh_adm else " · acesso direto 5432")) + "</small>",
+                        unsafe_allow_html=True,
+                    )
+                    if cb2.button("Abrir 🗄️", key=f"abrir_{b['banco']}",
+                                  type="primary", use_container_width=True):
+                        st.session_state["bd_aberto"] = b["banco"]
+                        st.rerun()
+
+        else:
+            # ---- DRILL-DOWN: dentro do banco ----
+            if st.button("← Voltar aos bancos"):
+                st.session_state.pop("bd_aberto", None)
+                st.rerun()
+            _info_b = next((b for b in _lista_b if b["banco"] == _bd_sel), {})
+            st.subheader(f"🗄️ {_bd_sel} — {_info_b.get('tamanho', '?')} · "
+                         f"dono `{_info_b.get('dono', '?')}`")
+            t_tab, t_chave, t_adm = st.tabs(
+                ["📋 Tabelas", "🔑 Conexão & Chaves", "👤 Usuários & Extensões"])
+
+            with t_tab:
+                ok_t, out_t = psql_run(
+                    "select c.relname as tabela, "
+                    "pg_size_pretty(pg_total_relation_size(c.oid)) as tamanho, "
+                    "coalesce(s.n_live_tup,0) as linhas from pg_class c "
+                    "join pg_namespace n on n.oid=c.relnamespace "
+                    "left join pg_stat_user_tables s on s.relid=c.oid "
+                    "where n.nspname='public' and c.relkind='r' "
+                    "order by pg_total_relation_size(c.oid) desc;", banco=_bd_sel)
+                _ts = csv_linhas(out_t) if ok_t else []
+                if not ok_t:
+                    st.error(out_t[:400])
+                elif _ts:
+                    st.dataframe(_ts, use_container_width=True, hide_index=True,
+                                 height=min(420, 60 + 35 * len(_ts)))
+                else:
+                    st.info("Banco ainda sem tabelas"
+                            + (" — o schema do Innova chega na FASE 3 da migração "
+                               "(Drizzle)." if _bd_sel == "innova" else "."))
+
+            with t_chave:
+                cred = db_cred()
+                _w, _a = cred.get("worker", {}), cred.get("app", {})
+                if _bd_sel == "innova":
+                    _anon, _serv = jwt_banco("anon"), jwt_banco("service_role")
+                    if not _anon:
+                        st.warning("Segredo do PostgREST não encontrado "
+                                   "(~/.postgrest_jwt_secret) — FASE 2.5.")
+                    else:
+                        st.caption("Ficha pro Multi-Pool / apps externos — formato "
+                                   "Supabase. ⚠️ mostra segredos (painel logado).")
+                        st.code(
+                            f"Label        : 🏠 VPS Interno (local)\n"
+                            f"Supabase URL : {URL_BASE}\n"
+                            f"Project ID   : vps-interno\n"
+                            f"Region       : vps-local\n"
+                            f"Anon Key     : {_anon}\n"
+                            f"Service Key  : {_serv}\n"
+                            f"DB Password  : {_w.get('pass', '?')}\n"
+                            f"Database URL : postgres://{_w.get('user', '?')}:"
+                            f"{_w.get('pass', '?')}@127.0.0.1:5432/innova\n"
+                            f"App (Drizzle): postgres://{_a.get('user', '?')}:"
+                            f"{_a.get('pass', '?')}@127.0.0.1:5432/innova",
+                            language="text")
+                        st.caption(f"REST: `GET {URL_BASE}/rest/v1/<tabela>` com "
+                                   "headers `apikey` + `Authorization: Bearer <key>`.")
+                else:
+                    st.caption("Banco sem API REST (a /rest/v1 serve o `innova`). "
+                               "Acesso direto na porta local 5432:")
+                    st.code(f"postgres://SEU_USUARIO:SENHA@127.0.0.1:5432/{_bd_sel}",
+                            language="text")
+                    st.markdown("<small>O usuário/senha são os criados junto com o "
+                                "banco (➕ Novo banco) — senha mostrada na criação. "
+                                "Apps no próprio servidor usam direto; do seu PC, "
+                                "túnel SSH.</small>", unsafe_allow_html=True)
+                st.markdown(f"<small>🔌 Do SEU PC (dev): "
+                            f"<code>ssh -i CHAVE -L 5432:127.0.0.1:5432 "
+                            f"ubuntu@{IP_PUBLICO}</code> e conecte em "
+                            f"<code>localhost:5432</code>.</small>",
+                            unsafe_allow_html=True)
+
+            with t_adm:
+                c_u, c_e = st.columns(2)
+                ok_u, out_u = psql_run(
+                    "select rolname as papel, rolcanlogin as faz_login, "
+                    "rolcreatedb as cria_banco from pg_roles "
+                    "where rolname not like 'pg\\_%' order by 1;", banco="postgres")
+                if ok_u:
+                    c_u.markdown("##### 👤 Usuários / papéis")
+                    c_u.dataframe(csv_linhas(out_u), use_container_width=True,
+                                  hide_index=True)
+                ok_e, out_e = psql_run("select extname as extensao, extversion as "
+                                       "versao from pg_extension order by 1;",
+                                       banco=_bd_sel)
+                if ok_e:
+                    c_e.markdown("##### 🧩 Extensões")
+                    c_e.dataframe(csv_linhas(out_e), use_container_width=True,
+                                  hide_index=True)
+
+    with tab_bk:
+        BK_CFG = Path.home() / ".vps_backup.json"
+        try:
+            _bcfg = json.loads(BK_CFG.read_text())
+        except Exception:
+            _bcfg = {}
+        _jobs = _bcfg.get("jobs")
+        if _jobs is None:
+            _jobs = [{"id": "diario_local", "nome": "📁 Diário local (03:30)",
+                      "ativo": True, "hora": "03",
+                      "dias": [1, 2, 3, 4, 5, 6, 7],
+                      "destino": "/home/ubuntu/backups_pg", "manter_dias": 7}]
             try:
-                _bcfg = json.loads(BK_CFG.read_text())
-            except Exception:
-                _bcfg = {}
-            _c1, _c2, _c3 = st.columns([1.2, 1.6, 2.2],
-                                       vertical_alignment="center")
-            _b_on = _c1.toggle("🟢 Ativo", value=bool(_bcfg.get("ativo", True)),
-                               help="Desligado = o timer continua rodando mas "
-                                    "não faz nada.")
-            _freqs = {"1x por dia (03:30)": "diario", "2x por dia": "12h",
-                      "4x por dia": "6h", "Toda hora": "1h"}
-            _freq_atual = _bcfg.get("frequencia", "diario")
-            _freq_lbl = _c2.selectbox(
-                "Frequência", list(_freqs.keys()),
-                index=list(_freqs.values()).index(_freq_atual)
-                if _freq_atual in _freqs.values() else 0)
-            _dest = _c3.text_input(
-                "Destino externo (rclone — opcional)",
-                value=_bcfg.get("destino", ""),
-                placeholder="ex.: gdrive:BackupsVPS",
-                help="Configure uma vez no SSH: rclone config (suporta Google "
-                     "Drive, OneDrive, S3...). Vazio = só local.")
-            if st.button("💾 Salvar configuração do backup"):
-                try:
-                    BK_CFG.write_text(json.dumps(
-                        {"ativo": _b_on, "frequencia": _freqs[_freq_lbl],
-                         "destino": _dest.strip()}, ensure_ascii=False))
-                    st.success("Config salva — vale a partir da próxima ronda "
-                               "do timer.")
-                except Exception as e:
-                    st.error(f"falha ao salvar: {e}")
-            try:
-                _last = json.loads((Path.home() / ".vps_backup_last.json"
-                                    ).read_text())
-                st.caption(f"🕐 última execução: {_last.get('quando', '?')} · "
-                           f"{_last.get('externo', '')}")
+                BK_CFG.write_text(json.dumps({"jobs": _jobs},
+                                             ensure_ascii=False, indent=1))
             except Exception:
                 pass
-            _bdir = Path("/home/ubuntu/backups_pg/diario")
-            _arqs = (sorted(_bdir.glob("*"), key=lambda p: p.stat().st_mtime,
-                            reverse=True) if _bdir.exists() else [])
-            if _arqs:
-                _idade_h = (time.time() - _arqs[0].stat().st_mtime) / 3600
-                st.markdown(("🟢" if _idade_h < 26 else "🔴 ATENÇÃO")
-                            + f" backup mais recente há **{_idade_h:.1f}h**")
-                st.dataframe(
-                    [{"arquivo": a.name,
-                      "tamanho": f"{a.stat().st_size / 1024:.0f} KB",
-                      "quando": time.strftime("%Y-%m-%d %H:%M",
-                                              time.localtime(a.stat().st_mtime))}
-                     for a in _arqs[:12]],
-                    use_container_width=True, hide_index=True, height=220)
-                _dump_opts = [a.name for a in _arqs if a.name.endswith(".sql.gz")]
-                if _dump_opts:
-                    _esc = st.selectbox("⬇ Exportar dump", _dump_opts)
-                    _arq_esc = _bdir / _esc
-                    st.download_button(f"⬇ Baixar {_esc}",
-                                       data=_arq_esc.read_bytes(),
-                                       file_name=_esc, mime="application/gzip")
-            else:
-                st.info("Nenhum backup ainda — instale o timer (kit) ou clique "
-                        "abaixo pro primeiro.")
-            if st.button("▶ Backup AGORA", type="primary"):
-                with st.spinner("Gerando backup de todos os bancos..."):
-                    _rc_bk, _out_bk = _run(
-                        ["bash", "/home/ubuntu/vps-admin/backup_pg.sh", "force"],
-                        timeout=300)
-                (st.success if _rc_bk == 0 else st.error)(
-                    (_out_bk or "")[-500:] or "ok")
-            st.caption("Restaurar: `gunzip -c ARQ.sql.gz | sudo -u postgres psql "
-                       "-d BANCO` · segredos no `configs_*.tgz` · GFS: 7 diários, "
-                       "4 semanais, 6 mensais.")
-    else:
-        # ---- DRILL-DOWN: dentro do banco ----
-        if st.button("← Voltar aos bancos"):
-            st.session_state.pop("bd_aberto", None)
+
+        def _salvar_jobs():
+            BK_CFG.write_text(json.dumps({"jobs": _jobs},
+                                         ensure_ascii=False, indent=1))
+
+        _DIAS_LBL = {1: "seg", 2: "ter", 3: "qua", 4: "qui", 5: "sex",
+                     6: "sáb", 7: "dom"}
+        c_bk1, c_bk2 = st.columns([4.2, 1.5], vertical_alignment="center")
+        c_bk1.caption(
+            "Perfis independentes — cada um com agenda (dias + hora), destino "
+            "(📁 pasta local ou ☁️ nuvem via rclone) e retenção próprios. "
+            "O timer ronda de hora em hora e executa quem estiver no horário."
+        )
+        _f_nj = bool(st.session_state.get("form_novo_bk"))
+        if c_bk2.button("✖ Fechar" if _f_nj else "➕ Novo backup",
+                        type="secondary" if _f_nj else "primary",
+                        use_container_width=True):
+            st.session_state["form_novo_bk"] = not _f_nj
             st.rerun()
-        _info_b = next((b for b in _lista_b if b["banco"] == _bd_sel), {})
-        st.subheader(f"🗄️ {_bd_sel} — {_info_b.get('tamanho', '?')} · "
-                     f"dono `{_info_b.get('dono', '?')}`")
-        t_tab, t_chave, t_adm = st.tabs(
-            ["📋 Tabelas", "🔑 Conexão & Chaves", "👤 Usuários & Extensões"])
+        if st.session_state.get("form_novo_bk"):
+            with st.container(border=True):
+                with st.form("novo_bk", border=False):
+                    nbk1, nbk2, nbk3 = st.columns([2.4, 1.1, 1.4])
+                    _nome_bk = nbk1.text_input("Nome do perfil",
+                                               placeholder="☁️ Drive diário")
+                    _hora_bk = nbk2.selectbox(
+                        "Hora (xx:30)", [f"{h:02d}" for h in range(24)], index=3)
+                    _ret_bk = nbk3.number_input("Guardar por (dias)", 1, 365, 7)
+                    _dias_bk = st.multiselect("Dias da semana",
+                                              list(_DIAS_LBL.values()),
+                                              default=list(_DIAS_LBL.values()))
+                    _dest_bk = st.text_input(
+                        "Destino — pasta local OU remote rclone",
+                        placeholder="/home/ubuntu/backups_extra   ·   gdrive:BackupsVPS",
+                        help="Pasta local começa com / . Nuvem usa remote:pasta "
+                             "(configure antes com 'rclone config' no SSH — "
+                             "Google Drive, OneDrive, S3...).")
+                    _ok_nj = st.form_submit_button("Criar perfil 💾",
+                                                   type="primary")
+                if _ok_nj and _nome_bk.strip() and _dest_bk.strip():
+                    import re as _re
+                    _jobs.append({
+                        "id": (_re.sub(r"\\W+", "_", _nome_bk.strip().lower())[:28]
+                               + "_" + str(int(time.time()))[-4:]),
+                        "nome": _nome_bk.strip(), "ativo": True,
+                        "hora": _hora_bk,
+                        "dias": [k for k, v in _DIAS_LBL.items()
+                                 if v in _dias_bk] or [1, 2, 3, 4, 5, 6, 7],
+                        "destino": _dest_bk.strip(),
+                        "manter_dias": int(_ret_bk)})
+                    _salvar_jobs()
+                    st.session_state["form_novo_bk"] = False
+                    st.rerun()
+                elif _ok_nj:
+                    st.error("Preencha pelo menos nome e destino.")
 
-        with t_tab:
-            ok_t, out_t = psql_run(
-                "select c.relname as tabela, "
-                "pg_size_pretty(pg_total_relation_size(c.oid)) as tamanho, "
-                "coalesce(s.n_live_tup,0) as linhas from pg_class c "
-                "join pg_namespace n on n.oid=c.relnamespace "
-                "left join pg_stat_user_tables s on s.relid=c.oid "
-                "where n.nspname='public' and c.relkind='r' "
-                "order by pg_total_relation_size(c.oid) desc;", banco=_bd_sel)
-            _ts = csv_linhas(out_t) if ok_t else []
-            if not ok_t:
-                st.error(out_t[:400])
-            elif _ts:
-                st.dataframe(_ts, use_container_width=True, hide_index=True,
-                             height=min(420, 60 + 35 * len(_ts)))
-            else:
-                st.info("Banco ainda sem tabelas"
-                        + (" — o schema do Innova chega na FASE 3 da migração "
-                           "(Drizzle)." if _bd_sel == "innova" else "."))
+        try:
+            _est_bk = json.loads((Path.home() / ".vps_backup_estado.json"
+                                  ).read_text())
+        except Exception:
+            _est_bk = {}
+        for _j in list(_jobs):
+            with st.container(border=True):
+                cj1, cj2, cj3, cj4 = st.columns([3.6, 0.8, 1.0, 0.4],
+                                                vertical_alignment="center")
+                _dias_txt = ("todos os dias" if len(_j.get("dias", [])) == 7
+                             else "/".join(_DIAS_LBL[d]
+                                           for d in _j.get("dias", [])))
+                _ult_j = _est_bk.get(_j.get("id", ""), {})
+                cj1.markdown(
+                    f"**{_j.get('nome', _j.get('id', '?'))}**  \n"
+                    f"<small>🕐 {_j.get('hora', '03')}:30 · {_dias_txt} · "
+                    f"📦 retém {_j.get('manter_dias', 7)}d · "
+                    f"➡️ `{_j.get('destino', '?')}`  \n"
+                    f"🧾 {_ult_j.get('quando', 'nunca rodou')} "
+                    f"{_ult_j.get('resultado', '')}</small>",
+                    unsafe_allow_html=True)
+                _at_j = cj2.toggle("ligado", value=bool(_j.get("ativo")),
+                                   key=f"bkat_{_j.get('id')}")
+                if _at_j != bool(_j.get("ativo")):
+                    _j["ativo"] = _at_j
+                    _salvar_jobs()
+                    st.rerun()
+                if cj3.button("▶ Agora", key=f"bkrun_{_j.get('id')}",
+                              use_container_width=True):
+                    with st.spinner(f"Rodando {_j.get('nome')}..."):
+                        _rc_j2, _out_j2 = _run(
+                            ["python3", "/home/ubuntu/vps-admin/backup_pg.py",
+                             "force", _j.get("id", "")], timeout=600)
+                    (st.success if _rc_j2 == 0 else st.error)(
+                        (_out_j2 or "")[-400:] or "ok")
+                if cj4.button("✕", key=f"bkdel_{_j.get('id')}",
+                              help="Remove o perfil (não apaga os arquivos "
+                                   "já gerados)."):
+                    _jobs.remove(_j)
+                    _salvar_jobs()
+                    st.rerun()
 
-        with t_chave:
-            cred = db_cred()
-            _w, _a = cred.get("worker", {}), cred.get("app", {})
-            if _bd_sel == "innova":
-                _anon, _serv = jwt_banco("anon"), jwt_banco("service_role")
-                if not _anon:
-                    st.warning("Segredo do PostgREST não encontrado "
-                               "(~/.postgrest_jwt_secret) — FASE 2.5.")
-                else:
-                    st.caption("Ficha pro Multi-Pool / apps externos — formato "
-                               "Supabase. ⚠️ mostra segredos (painel logado).")
-                    st.code(
-                        f"Label        : 🏠 VPS Interno (local)\n"
-                        f"Supabase URL : {URL_BASE}\n"
-                        f"Project ID   : vps-interno\n"
-                        f"Region       : vps-local\n"
-                        f"Anon Key     : {_anon}\n"
-                        f"Service Key  : {_serv}\n"
-                        f"DB Password  : {_w.get('pass', '?')}\n"
-                        f"Database URL : postgres://{_w.get('user', '?')}:"
-                        f"{_w.get('pass', '?')}@127.0.0.1:5432/innova\n"
-                        f"App (Drizzle): postgres://{_a.get('user', '?')}:"
-                        f"{_a.get('pass', '?')}@127.0.0.1:5432/innova",
-                        language="text")
-                    st.caption(f"REST: `GET {URL_BASE}/rest/v1/<tabela>` com "
-                               "headers `apikey` + `Authorization: Bearer <key>`.")
-            else:
-                st.caption("Banco sem API REST (a /rest/v1 serve o `innova`). "
-                           "Acesso direto na porta local 5432:")
-                st.code(f"postgres://SEU_USUARIO:SENHA@127.0.0.1:5432/{_bd_sel}",
-                        language="text")
-                st.markdown("<small>O usuário/senha são os criados junto com o "
-                            "banco (➕ Novo banco) — senha mostrada na criação. "
-                            "Apps no próprio servidor usam direto; do seu PC, "
-                            "túnel SSH.</small>", unsafe_allow_html=True)
-            st.markdown(f"<small>🔌 Do SEU PC (dev): "
-                        f"<code>ssh -i CHAVE -L 5432:127.0.0.1:5432 "
-                        f"ubuntu@{IP_PUBLICO}</code> e conecte em "
-                        f"<code>localhost:5432</code>.</small>",
-                        unsafe_allow_html=True)
-
-        with t_adm:
-            c_u, c_e = st.columns(2)
-            ok_u, out_u = psql_run(
-                "select rolname as papel, rolcanlogin as faz_login, "
-                "rolcreatedb as cria_banco from pg_roles "
-                "where rolname not like 'pg\\_%' order by 1;", banco="postgres")
-            if ok_u:
-                c_u.markdown("##### 👤 Usuários / papéis")
-                c_u.dataframe(csv_linhas(out_u), use_container_width=True,
-                              hide_index=True)
-            ok_e, out_e = psql_run("select extname as extensao, extversion as "
-                                   "versao from pg_extension order by 1;",
-                                   banco=_bd_sel)
-            if ok_e:
-                c_e.markdown("##### 🧩 Extensões")
-                c_e.dataframe(csv_linhas(out_e), use_container_width=True,
-                              hide_index=True)
+        _locais = [Path(str(_j.get("destino", ""))) for _j in _jobs
+                   if str(_j.get("destino", "")).startswith("/")]
+        _arqs_bk = []
+        for _d in set(_locais):
+            if _d.exists():
+                _arqs_bk += list(_d.glob("*.sql.gz"))
+        _arqs_bk = sorted(_arqs_bk, key=lambda p: p.stat().st_mtime,
+                          reverse=True)[:20]
+        if _arqs_bk:
+            with st.expander(f"⬇ Exportar dumps locais ({len(_arqs_bk)})"):
+                _esc_bk = st.selectbox("Arquivo", [str(a) for a in _arqs_bk])
+                _p_esc = Path(_esc_bk)
+                st.download_button(f"⬇ Baixar {_p_esc.name}",
+                                   data=_p_esc.read_bytes(),
+                                   file_name=_p_esc.name,
+                                   mime="application/gzip")
+        st.caption("Restaurar: `gunzip -c ARQ.sql.gz | sudo -u postgres psql "
+                   "-d BANCO` · cada execução também guarda `configs_*.tgz` "
+                   "(segredos do servidor).")
 
 
 # ============================================================

@@ -1,8 +1,8 @@
 [Unit]
-Description=VPS Backup (Postgres + configs, rotacao GFS)
+Description=VPS Backup multi-perfis (Postgres + configs)
 After=postgresql.service
 
 [Service]
 Type=oneshot
 User=ubuntu
-ExecStart=/home/ubuntu/vps-admin/backup_pg.sh
+ExecStart=/usr/bin/python3 /home/ubuntu/vps-admin/backup_pg.py
