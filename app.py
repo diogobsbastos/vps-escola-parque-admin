@@ -2162,7 +2162,9 @@ elif pagina == "💾 Servidor & Limites":
             + (f"certificado válido até `{_val}`" if _val else "⚠️ não consegui ler o certificado")
             + " · renovação automática (certbot)  \n"
             f"🦆 DNS: **DuckDNS** (Google `diogobsbastos@gmail.com`) · "
-            f"📄 Fonte única: `~/.vps_config.json` — mudou lá, o painel INTEIRO se adapta."
+            f"📄 Fonte única: `~/.vps_config.json` — mudou lá, o painel INTEIRO se adapta.  \n"
+            f"⭐ Este é o **domínio-mãe** (painel, API LLM, MCP, campainha do webhook). "
+            f"Domínios extras de apps — ex.: frontend — vivem na página 🌐 Domínios & Rotas."
         )
         if c_mig.button("🔁 Migrar domínio", use_container_width=True,
                         help="Troca o domínio/HTTPS do servidor: grava a nova config e "
