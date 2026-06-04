@@ -1024,6 +1024,28 @@ def dialog_console_sql() -> None:
                 st.error(out_q[:1000])
 
 
+def rclone_conf_gdrive(sa_path: str, folder_id: str) -> None:
+    """Escreve/substitui o remote [gdrive] no rclone.conf (service account)."""
+    conf_p = Path.home() / ".config" / "rclone" / "rclone.conf"
+    conf_p.parent.mkdir(parents=True, exist_ok=True)
+    txt = conf_p.read_text() if conf_p.exists() else ""
+    blocos, atual = [], []
+    for ln in txt.splitlines(keepends=True):
+        if ln.startswith("["):
+            if atual:
+                blocos.append("".join(atual))
+            atual = []
+        atual.append(ln)
+    if atual:
+        blocos.append("".join(atual))
+    blocos = [b for b in blocos if b.strip() and not b.startswith("[gdrive]")]
+    novo = ("[gdrive]\ntype = drive\nscope = drive\n"
+            f"service_account_file = {sa_path}\n")
+    if folder_id.strip():
+        novo += f"root_folder_id = {folder_id.strip()}\n"
+    conf_p.write_text("".join(blocos) + ("\n" if blocos else "") + novo)
+
+
 KIT_REST_LOCAL = r"""sudo tee /etc/nginx/sites-available/local-rest >/dev/null <<'EOF'
 server {
     listen 127.0.0.1:8088;
@@ -2593,6 +2615,45 @@ elif pagina == "🐘 Supabase VPS":
                     _jobs.remove(_j)
                     _salvar_jobs()
                     st.rerun()
+
+        with st.expander("☁️ Conectar Google Drive — modo profissional "
+                         "(service account, sem navegador no servidor)"):
+            st.markdown(
+                "<small>**Uma vez só, no navegador do PC:** "
+                "1️⃣ console.cloud.google.com → projeto novo (ex.: vps-backups) · "
+                "2️⃣ APIs & Services → Library → **Google Drive API** → Enable · "
+                "3️⃣ Credentials → Create credentials → **Service account** → "
+                "criar · 4️⃣ na service account → Keys → Add key → **JSON** "
+                "(baixa o arquivo) · 5️⃣ no SEU Drive: crie a pasta de backups e "
+                "**compartilhe** com o e-mail da service account "
+                "(xxx@…iam.gserviceaccount.com) como **Editor** · 6️⃣ copie o ID "
+                "da pasta (URL: /folders/<b>ID</b>) e preencha abaixo.</small>",
+                unsafe_allow_html=True)
+            _sa_up = st.file_uploader("Chave JSON da service account",
+                                      type=["json"], key="sa_up")
+            _fid = st.text_input("ID da pasta do Drive (compartilhada com o robô)",
+                                 key="sa_fid",
+                                 placeholder="ex.: 1AbC2dEf3GhI4jKl5MnO6pQr")
+            if st.button("🔌 Conectar Drive", type="primary"):
+                if not _sa_up:
+                    st.error("Suba o arquivo JSON primeiro.")
+                else:
+                    try:
+                        _sa_p = Path.home() / ".gdrive_sa.json"
+                        _sa_p.write_bytes(_sa_up.getvalue())
+                        os.chmod(_sa_p, 0o600)
+                        rclone_conf_gdrive(str(_sa_p), _fid or "")
+                        _rc_t, _out_t = _run(["rclone", "lsd", "gdrive:"],
+                                             timeout=30)
+                        if _rc_t == 0:
+                            st.success("✅ Drive conectado! Use destino "
+                                       "`gdrive:` (raiz da pasta) ou "
+                                       "`gdrive:Subpasta` nos perfis.")
+                        else:
+                            st.error("rclone não conectou: "
+                                     + (_out_t or "?")[-300:])
+                    except Exception as e:  # noqa: BLE001
+                        st.error(f"falha: {e}")
 
         _locais = [Path(str(_j.get("destino", ""))) for _j in _jobs
                    if str(_j.get("destino", "")).startswith("/")]
