@@ -1230,7 +1230,7 @@ elif pagina == "🌿 Git & Deploys":
         m, s2 = divmod(int(seg), 60)
         c_cr1, c_cr2 = st.columns([1.6, 4], vertical_alignment="center")
         c_cr1.markdown(f"### 🕐 `{m:02d}:{s2:02d}`")
-        c_cr2.progress(max(0.0, min(1.0, 1 - seg / 120)),
+        c_cr2.progress(max(0.0, min(1.0, 1 - seg / 30)),
                        text="próxima ronda do vigia — projetos com ⚙️ auto ligado "
                             "são atualizados se houver commit novo no GitHub")
     _cronometro_vigia()

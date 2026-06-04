@@ -1,9 +1,9 @@
 [Unit]
-Description=Roda o auto-deploy a cada 2 minutos
+Description=Roda o auto-deploy a cada 30 segundos
 
 [Timer]
 OnBootSec=90
-OnUnitActiveSec=120
+OnUnitActiveSec=30
 
 [Install]
 WantedBy=timers.target
