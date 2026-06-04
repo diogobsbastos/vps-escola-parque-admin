@@ -1105,8 +1105,8 @@ elif pagina == "🌿 Git & Deploys":
                 situ = "🟢 em dia com o GitHub"
             else:
                 situ = "🟠 atualização disponível!"
-            c1, c0, c2, c3 = st.columns([3.3, 0.9, 1.3, 1.3],
-                                        vertical_alignment="center")
+            c1, c0, c2, c3, cx = st.columns([3.2, 0.9, 1.2, 1.2, 0.4],
+                                            vertical_alignment="center")
             c1.markdown(
                 f"**{conf['rotulo']}**  \n"
                 f"`{repo}` · GitHub `{remoto}` · produção `{local}`  \n"
@@ -1141,11 +1141,19 @@ elif pagina == "🌿 Git & Deploys":
                 else:
                     st.error("Deploy falhou: " + msg)
             if repo in _extras_git and repo not in GIT_PROJETOS:
-                if st.button("🗑️ Desconectar do painel (não apaga nada)",
-                             key=f"unrepo_{repo}"):
-                    _extras_git.pop(repo, None)
-                    salvar_git_projetos(_extras_git)
-                    st.rerun()
+                with cx.popover("✕", use_container_width=True):
+                    st.markdown(f"**Remover `{repo}` do painel?**")
+                    st.caption(
+                        "Isso SÓ tira o projeto desta lista (e do vigia auto-deploy). "
+                        "NÃO mexe no GitHub, NÃO apaga arquivos e NÃO para o app no "
+                        "servidor — tudo continua rodando. Pra trazer de volta: "
+                        "➕ Conectar repo."
+                    )
+                    if st.button("Confirmar remoção", key=f"rmconf_{repo}",
+                                 type="primary", use_container_width=True):
+                        _extras_git.pop(repo, None)
+                        salvar_git_projetos(_extras_git)
+                        st.rerun()
     st.divider()
     st.caption(
         "🔜 Próximos a conectar: `escola-parque` e `sertanejo-lab` (entram aqui "
