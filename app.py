@@ -1102,7 +1102,6 @@ with st.sidebar:
         "🚀 Aplicativos",
         "🌐 Domínios & Rotas",
         "🌿 Git & Deploys",
-        "🚀 Deploys",
         "🦙 Ollama (IA local)",
         "🔑 API da LLM",
         "🔌 Acesso MCP (Claude)",
@@ -1513,298 +1512,294 @@ sudo certbot --nginx -d {_d} --redirect -m diogobsbastos@gmail.com --agree-tos -
 # ============================================================
 
 elif pagina == "🌿 Git & Deploys":
-    c_t, c_add, c_wh, c_gh = st.columns([3.0, 1.4, 1.1, 1.0],
-                                        vertical_alignment="center")
-    with c_wh:
-        if st.button("🪝 Webhook", use_container_width=True,
-                     help="Campainha do push→deploy: status por repo, "
-                          "conectar/desconectar e kit de migração."):
-            dialog_webhook()
-    with c_t:
-        st.title("🌿 Git & Deploys")
-    with c_add:
-        _form_aberto = bool(st.session_state.get("form_repo"))
-        if st.button("✖ Fechar formulário" if _form_aberto else "➕ Conectar repo",
-                     type="secondary" if _form_aberto else "primary",
-                     use_container_width=True):
-            st.session_state["form_repo"] = not _form_aberto
-            st.rerun()
-    with c_gh:
-        st.link_button("🐙 GitHub", f"https://github.com/{GIT_USER}?tab=repositories",
-                       use_container_width=True)
-    if st.session_state.get("form_repo"):
-        with st.container(border=True):
-            st.markdown("**Conectar um repositório do GitHub a uma pasta do servidor**")
-            with st.form("conectar_repo", clear_on_submit=True, border=False):
-                f1, f2 = st.columns(2)
-                repo_novo = f1.text_input(f"Repo (em github.com/{GIT_USER}/...)",
-                                          placeholder="ex.: sertanejo-lab")
-                rotulo_novo = f2.text_input("Rótulo no painel (com emoji!)",
-                                            placeholder="🎸 Sertanejo Lab")
-                f3, f4 = st.columns(2)
-                pasta_nova = f3.text_input("Pasta no servidor (deve ser um clone do repo)",
-                                           placeholder="/home/ubuntu/sertanejo-lab")
-                svc_novos = f4.multiselect("Serviços a reiniciar no deploy",
-                                           list(todos_servicos().keys()))
-                build_novo = st.text_input(
-                    "Comando de build (opcional — apps compilados, ex. Next.js)",
-                    placeholder="npm install && npm run build",
-                    help="Roda na pasta APÓS o pull e ANTES do restart. Se falhar, "
-                         "nada é reiniciado (a produção continua na versão antiga).",
-                )
-                ok_repo = st.form_submit_button("Conectar 🌿", type="primary")
-            if ok_repo and repo_novo.strip() and pasta_nova.strip():
-                extras_r = git_projetos_extras()
-                extras_r[repo_novo.strip()] = {
-                    "rotulo": rotulo_novo.strip() or repo_novo.strip(),
-                    "pull": pasta_nova.strip(),
-                    "servicos": svc_novos,
-                }
-                if build_novo.strip():
-                    extras_r[repo_novo.strip()]["build"] = build_novo.strip()
-                if salvar_git_projetos(extras_r):
-                    _msg_hook = gh_hook_sincronizar(repo_novo.strip())
-                    gh_hook_do_repo.clear()
-                    st.toast(f"🪝 campainha do repo novo: {_msg_hook}")
-                    st.session_state["form_repo"] = False
-                    time.sleep(1.2)
-                    st.rerun()
-                else:
-                    st.error("Falha ao salvar o registro.")
-            elif ok_repo:
-                st.error("Preencha pelo menos o repo e a pasta.")
-    st.caption(
-        "A ponte oficial da casa: **PC (oficina) → GitHub privado (cartório) → "
-        "Servidor (produção)**. ↻ Atualizar = puxa o último commit, aplica nas "
-        "pastas de produção (sem tocar nos venvs) e reinicia os serviços do projeto. "
-        "Histórico e rollback ficam no GitHub."
-    )
-
-    @st.fragment(run_every=3)
-    def _status_deploy():
-        seg = autodeploy_proximo()
-        if seg == -1:
-            st.markdown("### 🔨 Deploy em andamento")
-            st.progress(1.0, text="o vigia está aplicando (pull/build/restart) — "
-                                  "esta faixa volta ao normal quando ele terminar")
-            _rc_j, _out_j = _run(["journalctl", "-u", "vpsautodeploy", "-n", "14",
-                                  "--no-pager", "-o", "cat"], timeout=5)
-            if _rc_j == 0 and _out_j:
-                st.code(_out_j[-1600:], language="text")
-            return
-        hook_on = webhook_ativo()
-        ultimo = webhook_ultimo_push()
-        with st.container(border=True):
-            c_w, c_u, c_r = st.columns([1.9, 2.7, 1.7], vertical_alignment="center")
-            c_w.markdown(
-                ("⚡ **Webhook** 🟢 ativo  \n<small>push no GitHub → deploy em ~5s</small>")
-                if hook_on else
-                ("⚡ **Webhook** 🔴 fora do ar  \n<small>deploys só pela ronda — "
-                 "conferir serviço `vpswebhook`</small>"),
-                unsafe_allow_html=True,
-            )
-            c_u.markdown(
-                ("📨 **Último push recebido**  \n<small>" + ultimo + "</small>")
-                if ultimo else
-                ("📨 **Último push recebido**  \n<small>nenhum ainda — faça um "
-                 "commit e veja a mágica</small>"),
-                unsafe_allow_html=True,
-            )
-            if seg is None:
-                c_r.markdown("🕐 **Ronda de segurança**  \n<small>timer não "
-                             "instalado</small>", unsafe_allow_html=True)
-            else:
-                m, s2 = divmod(int(seg), 60)
-                c_r.markdown(f"🕐 **Ronda de segurança**  \n<small>próxima em "
-                             f"`{m:02d}:{s2:02d}` · rede de segurança do webhook</small>",
-                             unsafe_allow_html=True)
-    _status_deploy()
-
-    estado = git_estado()
-    _extras_git = git_projetos_extras()
-    for repo, conf in todos_git_projetos().items():
-        with st.container(border=True):
-            remoto = git_remote_head(repo)
-            info = estado.get(repo, {})
-            local = info.get("commit", "—")
-            if conf.get("pull"):
-                _, _h = _run(["git", "-C", conf["pull"], "rev-parse", "--short=10", "HEAD"])
-                local = (_h or "").strip() if _h and "fatal" not in _h else "—"
-            if remoto == "?":
-                situ = "🟡 GitHub inacessível (credencial?)"
-            elif local == "—":
-                situ = "⚪ nunca deployado pelo painel"
-            elif remoto == local:
-                situ = "🟢 em dia com o GitHub"
-            else:
-                situ = "🟠 atualização disponível!"
-            c1, c0, c2, c3, cx = st.columns([3.2, 0.9, 1.2, 1.2, 0.4],
+    tab_git, tab_dep = st.tabs(["🐙 GitHub", "🚀 Deploys"])
+    with tab_git:
+        c_t, c_add, c_wh, c_gh = st.columns([3.0, 1.4, 1.1, 1.0],
                                             vertical_alignment="center")
-            c1.markdown(
-                f"**{conf['rotulo']}**  \n"
-                f"`{repo}` · GitHub `{remoto}` · produção `{local}`  \n"
-                f"{situ} <small><span style='color:#9ca3af'>· "
-                f"{info.get('quando', 'sem registro')}</span></small>",
-                unsafe_allow_html=True,
-            )
-            _auto_atual = bool(conf.get("auto"))
-            _auto = c0.toggle("⚙️ auto", value=_auto_atual, key=f"auto_{repo}",
-                              help="Auto-deploy: push no GitHub → webhook dispara o vigia "
-                                   "na hora (~5s); a ronda de 2 min cobre qualquer "
-                                   "falha. Desligado = só deploy manual pelo ↻.")
-            if _auto != _auto_atual:
-                _ex = git_projetos_extras()
-                _ex[repo] = {**conf, "auto": _auto}
-                salvar_git_projetos(_ex)
-                st.rerun()
-            c2.link_button("Ver repo", f"https://github.com/{GIT_USER}/{repo}",
-                           use_container_width=True)
-            if c3.button("↻ Atualizar", key=f"dep_{repo}", type="primary",
+        with c_wh:
+            if st.button("🪝 Webhook", use_container_width=True,
+                         help="Campainha do push→deploy: status por repo, "
+                              "conectar/desconectar e kit de migração."):
+                dialog_webhook()
+        with c_t:
+            st.title("🌿 Git & Deploys")
+        with c_add:
+            _form_aberto = bool(st.session_state.get("form_repo"))
+            if st.button("✖ Fechar formulário" if _form_aberto else "➕ Conectar repo",
+                         type="secondary" if _form_aberto else "primary",
                          use_container_width=True):
-                if remoto != "?" and local not in ("—", "") and remoto == local:
-                    st.info("✅ Já está em dia com o GitHub — nada a atualizar. "
-                            "Commit novo entra sozinho (webhook, ~5s). Precisa "
-                            "reaplicar à força? Use ✏️ → ↻ Forçar redeploy.")
-                else:
-                    st.info("⏳ Puxando do GitHub e aplicando... o painel vai PISCAR "
-                            "no fim (reinicia a si mesmo). Dê F5 em ~10s.")
-                    ok, msg = git_deploy(repo, conf)
-                    if ok:
-                        st.success(f"✅ Commit `{msg}` aplicado. Reiniciando: "
-                                   + ", ".join(conf["servicos"]))
-                        for s in conf["servicos"]:
-                            acao_servico(s, "restart")
-                            time.sleep(1)
-                        st.rerun()
-                    else:
-                        st.error("Deploy falhou: " + msg)
-            with cx.popover("✏️"):
-                st.markdown(f"**⚙️ Configurar `{repo}`**")
-                with st.form(f"edit_{repo}", border=False):
-                    e_rot = st.text_input("Rótulo", value=conf.get("rotulo", repo))
-                    e_pull = st.text_input(
-                        "Pasta (clone) no servidor",
-                        value=conf.get("pull", ""),
-                        help="Vazio = mantém o modo atual (ex.: mapa do VPS Admin).",
-                    )
-                    e_build = st.text_input(
-                        "Comando de build (opcional)",
-                        value=conf.get("build", ""),
-                        placeholder="npm install && npm run build",
-                        help="Roda após o pull, antes do restart. Build falhou = "
-                             "nada reinicia (produção segue na versão anterior).",
-                    )
-                    e_svc = st.multiselect(
-                        "Serviços a reiniciar",
-                        list(todos_servicos().keys()),
-                        default=[x for x in conf.get("servicos", [])
-                                 if x in todos_servicos()],
-                    )
-                    sv_ed = st.form_submit_button("💾 Salvar", type="primary",
-                                                  use_container_width=True)
-                if sv_ed:
-                    _ex_ed = git_projetos_extras()
-                    novo_conf = {**conf, "rotulo": e_rot.strip() or repo,
-                                 "servicos": e_svc}
-                    if e_pull.strip():
-                        novo_conf["pull"] = e_pull.strip()
-                    if e_build.strip():
-                        novo_conf["build"] = e_build.strip()
-                    else:
-                        novo_conf.pop("build", None)
-                    _ex_ed[repo] = novo_conf
-                    salvar_git_projetos(_ex_ed)
-                    st.rerun()
-                st.divider()
-                if st.button("↻ Forçar redeploy", key=f"force_{repo}",
-                             use_container_width=True,
-                             help="Reaplica o commit atual do GitHub mesmo já "
-                                  "estando em dia (reinstala arquivos + restart)."):
-                    ok_f, msg_f = git_deploy(repo, conf)
-                    if ok_f:
-                        for s in conf["servicos"]:
-                            acao_servico(s, "restart")
-                            time.sleep(1)
-                        st.rerun()
-                    else:
-                        st.error("Forçar redeploy falhou: " + msg_f)
-                if repo in _extras_git and repo not in GIT_PROJETOS:
-                    st.divider()
-                    st.caption("Remover do painel — o app continua rodando; "
-                               "não mexe no GitHub nem nos arquivos.")
-                    if st.button("✕ Remover do painel", key=f"rmconf_{repo}",
-                                 use_container_width=True):
-                        _extras_git.pop(repo, None)
-                        salvar_git_projetos(_extras_git)
-                        st.rerun()
-    st.divider()
-    st.caption(
-        "⚡ Fluxo da casa: commit → GitHub toca a campainha (webhook) → vigia aplica "
-        "em ~5s. A ronda de 2 min é rede de segurança. O Claude opera esta ponte via MCP."
-    )
-
-
-# ============================================================
-# PAGINA: Deploys (linha do tempo estilo Vercel)
-# ============================================================
-
-elif pagina == "🚀 Deploys":
-    st.title("🚀 Deploys")
-    st.caption(
-        "O **Git** (página 🌿) cuida do código; **aqui você acompanha o que foi "
-        "PRO AR** — como no painel do Vercel: o que subiu, quando, por onde "
-        "(webhook/ronda/manual) e se deu certo."
-    )
-
-    @st.fragment(run_every=4)
-    def _deploys_live():
-        seg = autodeploy_proximo()
-        if seg == -1:
-            st.markdown("#### 🔨 Deploy em andamento AGORA")
-            st.progress(1.0, text="vigia aplicando (pull → build → restart) — "
-                                  "log ao vivo abaixo")
-            _rc_j, _out_j = _run(["journalctl", "-u", "vpsautodeploy", "-n", "16",
-                                  "--no-pager", "-o", "cat"], timeout=5)
-            if _rc_j == 0 and _out_j:
-                st.code(_out_j[-1800:], language="text")
-        else:
-            _hook = webhook_ativo()
-            _ult = webhook_ultimo_push()
+                st.session_state["form_repo"] = not _form_aberto
+                st.rerun()
+        with c_gh:
+            st.link_button("🐙 GitHub", f"https://github.com/{GIT_USER}?tab=repositories",
+                           use_container_width=True)
+        if st.session_state.get("form_repo"):
             with st.container(border=True):
-                _c1, _c2, _c3 = st.columns([1.6, 2.9, 1.5],
-                                           vertical_alignment="center")
-                _c1.markdown("⚡ **Webhook** "
-                             + ("🟢 ativo" if _hook else "🔴 fora do ar"))
-                _c2.markdown(("📨 último push: " + _ult) if _ult
-                             else "📨 nenhum push recebido ainda")
-                _c3.markdown("💤 esteira livre")
-        hist = git_hist_ler()
-        if not hist:
-            st.info("Nenhum deploy registrado ainda — faça um push que ele "
-                    "aparece aqui sozinho.")
-            return
-        _repos_h = sorted({e.get("repo", "?") for e in hist})
-        _f_h = st.selectbox("Projeto", ["📁 todos os projetos"] + _repos_h,
-                            key="dep_filtro")
-        _dados_h = [
-            {"quando": e.get("quando", "?"), "projeto": e.get("repo", "?"),
-             "commit": e.get("commit", "?"),
-             "status": e.get("status", "✅ ok"),
-             "origem": e.get("origem", "?")}
-            for e in reversed(hist)
-            if _f_h == "📁 todos os projetos" or e.get("repo") == _f_h
-        ]
-        st.dataframe(_dados_h, use_container_width=True, height=420,
-                     hide_index=True)
-        st.caption(f"{len(hist)} registros (guarda os 100 últimos) · "
-                   "✅ foi pro ar · ❌ falhou (produção segue na versão anterior) · "
-                   "🔄 página viva: atualiza sozinha a cada 4s")
-    _deploys_live()
+                st.markdown("**Conectar um repositório do GitHub a uma pasta do servidor**")
+                with st.form("conectar_repo", clear_on_submit=True, border=False):
+                    f1, f2 = st.columns(2)
+                    repo_novo = f1.text_input(f"Repo (em github.com/{GIT_USER}/...)",
+                                              placeholder="ex.: sertanejo-lab")
+                    rotulo_novo = f2.text_input("Rótulo no painel (com emoji!)",
+                                                placeholder="🎸 Sertanejo Lab")
+                    f3, f4 = st.columns(2)
+                    pasta_nova = f3.text_input("Pasta no servidor (deve ser um clone do repo)",
+                                               placeholder="/home/ubuntu/sertanejo-lab")
+                    svc_novos = f4.multiselect("Serviços a reiniciar no deploy",
+                                               list(todos_servicos().keys()))
+                    build_novo = st.text_input(
+                        "Comando de build (opcional — apps compilados, ex. Next.js)",
+                        placeholder="npm install && npm run build",
+                        help="Roda na pasta APÓS o pull e ANTES do restart. Se falhar, "
+                             "nada é reiniciado (a produção continua na versão antiga).",
+                    )
+                    ok_repo = st.form_submit_button("Conectar 🌿", type="primary")
+                if ok_repo and repo_novo.strip() and pasta_nova.strip():
+                    extras_r = git_projetos_extras()
+                    extras_r[repo_novo.strip()] = {
+                        "rotulo": rotulo_novo.strip() or repo_novo.strip(),
+                        "pull": pasta_nova.strip(),
+                        "servicos": svc_novos,
+                    }
+                    if build_novo.strip():
+                        extras_r[repo_novo.strip()]["build"] = build_novo.strip()
+                    if salvar_git_projetos(extras_r):
+                        _msg_hook = gh_hook_sincronizar(repo_novo.strip())
+                        gh_hook_do_repo.clear()
+                        st.toast(f"🪝 campainha do repo novo: {_msg_hook}")
+                        st.session_state["form_repo"] = False
+                        time.sleep(1.2)
+                        st.rerun()
+                    else:
+                        st.error("Falha ao salvar o registro.")
+                elif ok_repo:
+                    st.error("Preencha pelo menos o repo e a pasta.")
+        st.caption(
+            "A ponte oficial da casa: **PC (oficina) → GitHub privado (cartório) → "
+            "Servidor (produção)**. ↻ Atualizar = puxa o último commit, aplica nas "
+            "pastas de produção (sem tocar nos venvs) e reinicia os serviços do projeto. "
+            "Histórico e rollback ficam no GitHub."
+        )
 
-    with st.expander("🧾 Log bruto do vigia (últimas 60 linhas)"):
-        _rc_j, _out_j = _run(["journalctl", "-u", "vpsautodeploy", "-n", "60",
-                              "--no-pager", "-o", "short-iso"], timeout=6)
-        st.code((_out_j or "sem acesso ao journal")[-4000:], language="text")
+        @st.fragment(run_every=3)
+        def _status_deploy():
+            seg = autodeploy_proximo()
+            if seg == -1:
+                st.markdown("### 🔨 Deploy em andamento")
+                st.progress(1.0, text="o vigia está aplicando (pull/build/restart) — "
+                                      "esta faixa volta ao normal quando ele terminar")
+                _rc_j, _out_j = _run(["journalctl", "-u", "vpsautodeploy", "-n", "14",
+                                      "--no-pager", "-o", "cat"], timeout=5)
+                if _rc_j == 0 and _out_j:
+                    st.code(_out_j[-1600:], language="text")
+                return
+            hook_on = webhook_ativo()
+            ultimo = webhook_ultimo_push()
+            with st.container(border=True):
+                c_w, c_u, c_r = st.columns([1.9, 2.7, 1.7], vertical_alignment="center")
+                c_w.markdown(
+                    ("⚡ **Webhook** 🟢 ativo  \n<small>push no GitHub → deploy em ~5s</small>")
+                    if hook_on else
+                    ("⚡ **Webhook** 🔴 fora do ar  \n<small>deploys só pela ronda — "
+                     "conferir serviço `vpswebhook`</small>"),
+                    unsafe_allow_html=True,
+                )
+                c_u.markdown(
+                    ("📨 **Último push recebido**  \n<small>" + ultimo + "</small>")
+                    if ultimo else
+                    ("📨 **Último push recebido**  \n<small>nenhum ainda — faça um "
+                     "commit e veja a mágica</small>"),
+                    unsafe_allow_html=True,
+                )
+                if seg is None:
+                    c_r.markdown("🕐 **Ronda de segurança**  \n<small>timer não "
+                                 "instalado</small>", unsafe_allow_html=True)
+                else:
+                    m, s2 = divmod(int(seg), 60)
+                    c_r.markdown(f"🕐 **Ronda de segurança**  \n<small>próxima em "
+                                 f"`{m:02d}:{s2:02d}` · rede de segurança do webhook</small>",
+                                 unsafe_allow_html=True)
+        _status_deploy()
+
+        estado = git_estado()
+        _extras_git = git_projetos_extras()
+        for repo, conf in todos_git_projetos().items():
+            with st.container(border=True):
+                remoto = git_remote_head(repo)
+                info = estado.get(repo, {})
+                local = info.get("commit", "—")
+                if conf.get("pull"):
+                    _, _h = _run(["git", "-C", conf["pull"], "rev-parse", "--short=10", "HEAD"])
+                    local = (_h or "").strip() if _h and "fatal" not in _h else "—"
+                if remoto == "?":
+                    situ = "🟡 GitHub inacessível (credencial?)"
+                elif local == "—":
+                    situ = "⚪ nunca deployado pelo painel"
+                elif remoto == local:
+                    situ = "🟢 em dia com o GitHub"
+                else:
+                    situ = "🟠 atualização disponível!"
+                c1, c0, c2, c3, cx = st.columns([3.2, 0.9, 1.2, 1.2, 0.4],
+                                                vertical_alignment="center")
+                c1.markdown(
+                    f"**{conf['rotulo']}**  \n"
+                    f"`{repo}` · GitHub `{remoto}` · produção `{local}`  \n"
+                    f"{situ} <small><span style='color:#9ca3af'>· "
+                    f"{info.get('quando', 'sem registro')}</span></small>",
+                    unsafe_allow_html=True,
+                )
+                _auto_atual = bool(conf.get("auto"))
+                _auto = c0.toggle("⚙️ auto", value=_auto_atual, key=f"auto_{repo}",
+                                  help="Auto-deploy: push no GitHub → webhook dispara o vigia "
+                                       "na hora (~5s); a ronda de 2 min cobre qualquer "
+                                       "falha. Desligado = só deploy manual pelo ↻.")
+                if _auto != _auto_atual:
+                    _ex = git_projetos_extras()
+                    _ex[repo] = {**conf, "auto": _auto}
+                    salvar_git_projetos(_ex)
+                    st.rerun()
+                c2.link_button("Ver repo", f"https://github.com/{GIT_USER}/{repo}",
+                               use_container_width=True)
+                if c3.button("↻ Atualizar", key=f"dep_{repo}", type="primary",
+                             use_container_width=True):
+                    if remoto != "?" and local not in ("—", "") and remoto == local:
+                        st.info("✅ Já está em dia com o GitHub — nada a atualizar. "
+                                "Commit novo entra sozinho (webhook, ~5s). Precisa "
+                                "reaplicar à força? Use ✏️ → ↻ Forçar redeploy.")
+                    else:
+                        st.info("⏳ Puxando do GitHub e aplicando... o painel vai PISCAR "
+                                "no fim (reinicia a si mesmo). Dê F5 em ~10s.")
+                        ok, msg = git_deploy(repo, conf)
+                        if ok:
+                            st.success(f"✅ Commit `{msg}` aplicado. Reiniciando: "
+                                       + ", ".join(conf["servicos"]))
+                            for s in conf["servicos"]:
+                                acao_servico(s, "restart")
+                                time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("Deploy falhou: " + msg)
+                with cx.popover("✏️"):
+                    st.markdown(f"**⚙️ Configurar `{repo}`**")
+                    with st.form(f"edit_{repo}", border=False):
+                        e_rot = st.text_input("Rótulo", value=conf.get("rotulo", repo))
+                        e_pull = st.text_input(
+                            "Pasta (clone) no servidor",
+                            value=conf.get("pull", ""),
+                            help="Vazio = mantém o modo atual (ex.: mapa do VPS Admin).",
+                        )
+                        e_build = st.text_input(
+                            "Comando de build (opcional)",
+                            value=conf.get("build", ""),
+                            placeholder="npm install && npm run build",
+                            help="Roda após o pull, antes do restart. Build falhou = "
+                                 "nada reinicia (produção segue na versão anterior).",
+                        )
+                        e_svc = st.multiselect(
+                            "Serviços a reiniciar",
+                            list(todos_servicos().keys()),
+                            default=[x for x in conf.get("servicos", [])
+                                     if x in todos_servicos()],
+                        )
+                        sv_ed = st.form_submit_button("💾 Salvar", type="primary",
+                                                      use_container_width=True)
+                    if sv_ed:
+                        _ex_ed = git_projetos_extras()
+                        novo_conf = {**conf, "rotulo": e_rot.strip() or repo,
+                                     "servicos": e_svc}
+                        if e_pull.strip():
+                            novo_conf["pull"] = e_pull.strip()
+                        if e_build.strip():
+                            novo_conf["build"] = e_build.strip()
+                        else:
+                            novo_conf.pop("build", None)
+                        _ex_ed[repo] = novo_conf
+                        salvar_git_projetos(_ex_ed)
+                        st.rerun()
+                    st.divider()
+                    if st.button("↻ Forçar redeploy", key=f"force_{repo}",
+                                 use_container_width=True,
+                                 help="Reaplica o commit atual do GitHub mesmo já "
+                                      "estando em dia (reinstala arquivos + restart)."):
+                        ok_f, msg_f = git_deploy(repo, conf)
+                        if ok_f:
+                            for s in conf["servicos"]:
+                                acao_servico(s, "restart")
+                                time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("Forçar redeploy falhou: " + msg_f)
+                    if repo in _extras_git and repo not in GIT_PROJETOS:
+                        st.divider()
+                        st.caption("Remover do painel — o app continua rodando; "
+                                   "não mexe no GitHub nem nos arquivos.")
+                        if st.button("✕ Remover do painel", key=f"rmconf_{repo}",
+                                     use_container_width=True):
+                            _extras_git.pop(repo, None)
+                            salvar_git_projetos(_extras_git)
+                            st.rerun()
+        st.divider()
+        st.caption(
+            "⚡ Fluxo da casa: commit → GitHub toca a campainha (webhook) → vigia aplica "
+            "em ~5s. A ronda de 2 min é rede de segurança. O Claude opera esta ponte via MCP."
+        )
+
+    with tab_dep:
+        st.caption(
+            "O **Git** (página 🌿) cuida do código; **aqui você acompanha o que foi "
+            "PRO AR** — como no painel do Vercel: o que subiu, quando, por onde "
+            "(webhook/ronda/manual) e se deu certo."
+        )
+
+        @st.fragment(run_every=4)
+        def _deploys_live():
+            seg = autodeploy_proximo()
+            if seg == -1:
+                st.markdown("#### 🔨 Deploy em andamento AGORA")
+                st.progress(1.0, text="vigia aplicando (pull → build → restart) — "
+                                      "log ao vivo abaixo")
+                _rc_j, _out_j = _run(["journalctl", "-u", "vpsautodeploy", "-n", "16",
+                                      "--no-pager", "-o", "cat"], timeout=5)
+                if _rc_j == 0 and _out_j:
+                    st.code(_out_j[-1800:], language="text")
+            else:
+                _hook = webhook_ativo()
+                _ult = webhook_ultimo_push()
+                with st.container(border=True):
+                    _c1, _c2, _c3 = st.columns([1.6, 2.9, 1.5],
+                                               vertical_alignment="center")
+                    _c1.markdown("⚡ **Webhook** "
+                                 + ("🟢 ativo" if _hook else "🔴 fora do ar"))
+                    _c2.markdown(("📨 último push: " + _ult) if _ult
+                                 else "📨 nenhum push recebido ainda")
+                    _c3.markdown("💤 esteira livre")
+            hist = git_hist_ler()
+            if not hist:
+                st.info("Nenhum deploy registrado ainda — faça um push que ele "
+                        "aparece aqui sozinho.")
+                return
+            _repos_h = sorted({e.get("repo", "?") for e in hist})
+            _f_h = st.selectbox("Projeto", ["📁 todos os projetos"] + _repos_h,
+                                key="dep_filtro")
+            _dados_h = [
+                {"quando": e.get("quando", "?"), "projeto": e.get("repo", "?"),
+                 "commit": e.get("commit", "?"),
+                 "status": e.get("status", "✅ ok"),
+                 "origem": e.get("origem", "?")}
+                for e in reversed(hist)
+                if _f_h == "📁 todos os projetos" or e.get("repo") == _f_h
+            ]
+            st.dataframe(_dados_h, use_container_width=True, height=420,
+                         hide_index=True)
+            st.caption(f"{len(hist)} registros (guarda os 100 últimos) · "
+                       "✅ foi pro ar · ❌ falhou (produção segue na versão anterior) · "
+                       "🔄 página viva: atualiza sozinha a cada 4s")
+        _deploys_live()
+
+        with st.expander("🧾 Log bruto do vigia (últimas 60 linhas)"):
+            _rc_j, _out_j = _run(["journalctl", "-u", "vpsautodeploy", "-n", "60",
+                                  "--no-pager", "-o", "short-iso"], timeout=6)
+            st.code((_out_j or "sem acesso ao journal")[-4000:], language="text")
 
 
 # ============================================================
