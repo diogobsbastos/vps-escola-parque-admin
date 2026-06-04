@@ -1098,11 +1098,10 @@ def dialog_editar_backup(job_id: str) -> None:
               6: "sáb", 7: "dom"}
     nome_e = st.text_input("Nome", value=job.get("nome", ""))
     ce1, ce2 = st.columns(2)
-    import datetime as _dtm
-    _hm0 = (job.get("horario")
-            or str(job.get("hora", "03")) + ":30").split(":")
-    hora_e = ce1.time_input("Horário", step=300,
-                            value=_dtm.time(int(_hm0[0]), int(_hm0[1])))
+    hora_e = ce1.text_input("Horário (HH:MM)",
+                            value=(job.get("horario")
+                                   or str(job.get("hora", "03")) + ":30"),
+                            placeholder="ex.: 09:15")
     ret_e = ce2.number_input("Guardar por (dias)", 1, 365,
                              int(job.get("manter_dias", 7)))
     dias_e = st.multiselect("Dias da semana", list(DIAS_D.values()),
@@ -1120,9 +1119,13 @@ def dialog_editar_backup(job_id: str) -> None:
                            value=job.get("destino", ""))
     if st.button("💾 Salvar alterações", type="primary",
                  use_container_width=True):
+        import re as _re2
+        if not _re2.fullmatch(r"([01]\\d|2[0-3]):[0-5]\\d", hora_e.strip()):
+            st.error("Horário inválido — use HH:MM (ex.: 09:15).")
+            return
         job.update({
             "nome": nome_e.strip() or job.get("nome", ""),
-            "horario": hora_e.strftime("%H:%M"),
+            "horario": hora_e.strip(),
             "manter_dias": int(ret_e),
             "dias": [k for k, v in DIAS_D.items() if v in dias_e]
                     or job.get("dias", [1, 2, 3, 4, 5, 6, 7]),
@@ -2688,9 +2691,9 @@ elif pagina == "🐘 Supabase VPS":
                     nbk1, nbk2, nbk3 = st.columns([2.4, 1.1, 1.4])
                     _nome_bk = nbk1.text_input("Nome do perfil",
                                                placeholder="☁️ Drive diário")
-                    import datetime as _dtm
-                    _hora_bk = nbk2.time_input("Horário", step=300,
-                                               value=_dtm.time(3, 30))
+                    _hora_bk = nbk2.text_input("Horário (HH:MM)",
+                                               value="03:30",
+                                               placeholder="ex.: 09:15")
                     _ret_bk = nbk3.number_input("Guardar por (dias)", 1, 365, 7)
                     _dias_bk = st.multiselect("Dias da semana",
                                               list(_DIAS_LBL.values()),
@@ -2706,23 +2709,28 @@ elif pagina == "🐘 Supabase VPS":
                              "Google Drive, OneDrive, S3...).")
                     _ok_nj = st.form_submit_button("Criar perfil 💾",
                                                    type="primary")
-                if _ok_nj and _nome_bk.strip() and _dest_bk.strip():
+                if _ok_nj:
                     import re as _re
-                    _jobs.append({
-                        "id": (_re.sub(r"\\W+", "_", _nome_bk.strip().lower())[:28]
-                               + "_" + str(int(time.time()))[-4:]),
-                        "nome": _nome_bk.strip(), "ativo": True,
-                        "horario": _hora_bk.strftime("%H:%M"),
-                        "dias": [k for k, v in _DIAS_LBL.items()
-                                 if v in _dias_bk] or [1, 2, 3, 4, 5, 6, 7],
-                        "destino": _dest_bk.strip(),
-                        "bancos": _bks_bk,
-                        "manter_dias": int(_ret_bk)})
-                    _salvar_jobs()
-                    st.session_state["form_novo_bk"] = False
-                    st.rerun()
-                elif _ok_nj:
-                    st.error("Preencha pelo menos nome e destino.")
+                    if not (_nome_bk.strip() and _dest_bk.strip()):
+                        st.error("Preencha pelo menos nome e destino.")
+                    elif not _re.fullmatch(r"([01]\\d|2[0-3]):[0-5]\\d",
+                                           _hora_bk.strip()):
+                        st.error("Horário inválido — use HH:MM (ex.: 09:15).")
+                    else:
+                        _jobs.append({
+                            "id": (_re.sub(r"\\W+", "_",
+                                           _nome_bk.strip().lower())[:28]
+                                   + "_" + str(int(time.time()))[-4:]),
+                            "nome": _nome_bk.strip(), "ativo": True,
+                            "horario": _hora_bk.strip(),
+                            "dias": [k for k, v in _DIAS_LBL.items()
+                                     if v in _dias_bk] or [1, 2, 3, 4, 5, 6, 7],
+                            "destino": _dest_bk.strip(),
+                            "bancos": _bks_bk,
+                            "manter_dias": int(_ret_bk)})
+                        _salvar_jobs()
+                        st.session_state["form_novo_bk"] = False
+                        st.rerun()
 
         try:
             _est_bk = json.loads((Path.home() / ".vps_backup_estado.json"
