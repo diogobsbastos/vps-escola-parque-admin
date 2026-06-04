@@ -1737,4 +1737,4 @@ elif pagina == "👤 Conta":
                     except Exception as e:  # noqa: BLE001
                         st.error(f"Falha ao trocar senha: {e}")
 
-st.sidebar.caption("VPS Admin v2.1 · base replicável p/ futuras VPS")
+st.sidebar.caption("VPS Admin v2.2-auto · base replicável p/ futuras VPS")
