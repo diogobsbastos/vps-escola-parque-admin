@@ -321,6 +321,33 @@ def listar_bibliotecas() -> dict[str, list[dict]]:
             res[app_nome] = json.loads(out) if rc == 0 else []
         except Exception:
             res[app_nome] = []
+
+    # apps Node (ex.: frontend Next.js): o que está REALMENTE instalado
+    for pkg in sorted(glob.glob("/home/ubuntu/*/package.json")):
+        pasta = Path(pkg).parent
+        if not (pasta / "node_modules").is_dir():
+            continue
+        vistos: dict[str, str] = {}
+        try:  # package-lock = inventário exato (inclui dependências indiretas)
+            lock = json.loads((pasta / "package-lock.json").read_text())
+            for cam, info in (lock.get("packages") or {}).items():
+                if "node_modules/" not in cam:
+                    continue
+                nome_p = cam.split("node_modules/")[-1]
+                vistos.setdefault(nome_p, (info or {}).get("version", "?"))
+        except Exception:  # sem lock: varre o node_modules na unha
+            for d in sorted((pasta / "node_modules").glob("*")):
+                alvos = sorted(d.glob("*")) if d.name.startswith("@") else [d]
+                for a in alvos:
+                    try:
+                        meta = json.loads((a / "package.json").read_text())
+                        vistos.setdefault(
+                            (f"{d.name}/{a.name}" if d.name.startswith("@")
+                             else a.name), meta.get("version", "?"))
+                    except Exception:
+                        continue
+        res[f"🟩 {pasta.name} (node)"] = [
+            {"name": k, "version": v} for k, v in sorted(vistos.items())]
     return res
 
 
@@ -1084,8 +1111,9 @@ elif pagina == "🚀 Aplicativos":
             for i, (app_nome, pacotes) in enumerate(libs.items(), start=1):
                 cols_resumo[i].metric(app_nome, len(pacotes))
             st.caption(
-                "Cada app tem seu ambiente ISOLADO (venv) — versões podem diferir entre apps "
-                "sem conflito. Clique num app pra ver/filtrar a lista completa. Atualiza a cada 5 min."
+                "Cada app tem seu ambiente ISOLADO (venv Python ou node_modules) — versões "
+                "podem diferir entre apps sem conflito. 🟩 = app Node (conta também as "
+                "dependências indiretas). Clique pra ver/filtrar. Atualiza a cada 5 min."
             )
             for app_nome, pacotes in libs.items():
                 with st.expander(f"📦 **{app_nome}** — {len(pacotes)} bibliotecas"):
