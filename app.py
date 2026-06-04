@@ -286,6 +286,22 @@ def dominios_nginx() -> list[dict]:
     return list(achados.values())
 
 
+PORTAS_SERVICOS = {  # porta interna -> servico (traduz destinos do nginx p/ nome de app)
+    "8500": "vpsadmin", "8501": "escolaparque", "8502": "sertanejolab",
+    "3000": "innovafront", "8600": "llmgateway", "8700": "vpsmcp", "11434": "ollama",
+}
+
+
+def alvo_amigavel(alvo: str) -> str:
+    """Converte 'http://127.0.0.1:3000' em '🚀 Innova Front (porta 3000)'."""
+    import re as _re2
+    m = _re2.search(r":(\d+)", alvo or "")
+    svc = PORTAS_SERVICOS.get(m.group(1)) if m else None
+    if svc:
+        return f"{todos_servicos().get(svc, svc)} · porta {m.group(1)}"
+    return alvo or "(rotas internas abaixo)"
+
+
 @st.cache_data(ttl=600, show_spinner=False)
 def cert_validade_cache(dominio: str) -> str | None:
     return cert_validade(dominio)
@@ -1084,15 +1100,33 @@ sudo certbot --nginx -d {_d} --redirect -m diogobsbastos@gmail.com --agree-tos -
     for _dm in dominios_nginx():
         with st.container(border=True):
             _val_d = cert_validade_cache(_dm["dominio"]) if _dm["ssl"] else None
-            _alvo_txt = _dm["alvo"] or "(rotas internas — veja abaixo)"
-            st.markdown(
+            c_dmi, c_dmx = st.columns([5.4, 0.4], vertical_alignment="center")
+            c_dmi.markdown(
                 f"**{'🔒' if _dm['ssl'] else '⚠️ sem SSL'} "
                 f"[{_dm['dominio']}](https://{_dm['dominio']})**  \n"
-                f"→ `{_alvo_txt}` · arquivo `{_dm['arquivo']}`"
-                + (f" · <small><span style='color:#9ca3af'>cert até {_val_d}</span></small>"
-                   if _val_d else ""),
+                f"→ **{alvo_amigavel(_dm['alvo'])}**"
+                + (f" <small><span style='color:#9ca3af'>· cert até {_val_d}"
+                   f" · conf `{_dm['arquivo']}`</span></small>" if _val_d
+                   else f" <small><span style='color:#9ca3af'>· conf `{_dm['arquivo']}`</span></small>"),
                 unsafe_allow_html=True,
             )
+            if _dm["arquivo"] != "apps":
+                with c_dmx.popover("✕", use_container_width=True):
+                    st.markdown(f"**Remover o domínio `{_dm['dominio']}`?**")
+                    st.caption(
+                        "O app continua rodando — só o ENDEREÇO deixa de existir. "
+                        "Por segurança o painel não executa isso sozinho: rode no SSH:"
+                    )
+                    st.code(
+                        f"sudo rm -f /etc/nginx/sites-enabled/{_dm['arquivo']} "
+                        f"/etc/nginx/sites-available/{_dm['arquivo']}\n"
+                        f"sudo nginx -t && sudo systemctl reload nginx\n"
+                        f"sudo certbot delete --cert-name {_dm['dominio']} -n",
+                        language="bash",
+                    )
+            else:
+                c_dmx.markdown("<span title='Domínio principal — hospeda o painel; "
+                               "não removível por aqui'>🏛️</span>", unsafe_allow_html=True)
 
     st.divider()
     st.subheader("🛣️ Rotas internas do domínio principal")
@@ -1108,8 +1142,12 @@ sudo certbot --nginx -d {_d} --redirect -m diogobsbastos@gmail.com --agree-tos -
     rotas = rotas_nginx()
     if rotas:
         for r in rotas:
-            destino = f"{URL_BASE}{r if r != '=' else '/'}"
-            st.markdown(f"- `{r}` → [{destino}]({destino})")
+            if r.startswith("/mcp-"):
+                st.markdown("- 🔒 `/mcp-…/` → rota SECRETA do MCP (oculta de propósito — ver Acesso MCP)")
+                continue
+            _rr = "/" if r.startswith("=") else r
+            _sufx = " *(página inicial)*" if r.startswith("=") else ""
+            st.markdown(f"- `{_rr}`{_sufx} → [{URL_BASE}{_rr}]({URL_BASE}{_rr})")
     else:
         st.warning("Não consegui ler a config (permissão).")
     st.divider()
