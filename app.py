@@ -645,6 +645,77 @@ def webhook_ultimo_push() -> str:
     return ""
 
 
+def _gh_api(metodo: str, rota: str, corpo: dict | None = None) -> tuple[int, object]:
+    """Chamada crua na API do GitHub com o token do servidor."""
+    import requests
+    try:
+        tok = (Path.home() / ".github_token").read_text().strip()
+    except Exception:
+        return 0, {"message": "sem ~/.github_token"}
+    try:
+        r = requests.request(metodo, "https://api.github.com" + rota,
+                             headers={"Authorization": "Bearer " + tok,
+                                      "Accept": "application/vnd.github+json"},
+                             json=corpo, timeout=12)
+        return r.status_code, (r.json() if r.text else {})
+    except Exception as e:  # noqa: BLE001
+        return 0, {"message": str(e)}
+
+
+def webhook_url_atual() -> str:
+    """URL pública da campainha deste servidor ('' se kit não instalado)."""
+    try:
+        rota = (Path.home() / ".vps_webhook_rota").read_text().strip()
+    except Exception:
+        return ""
+    dominio = _cfg.get("dominio") or _cfg.get("ip") or ""
+    return f"https://{dominio}/{rota}/" if dominio and rota else ""
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def gh_hook_do_repo(repo: str) -> tuple[int | None, str, int]:
+    """(id, url, status_http) do webhook de deploy do repo (url com /hook-)."""
+    sc, hooks = _gh_api("GET", f"/repos/{GIT_USER}/{repo}/hooks")
+    if sc != 200 or not isinstance(hooks, list):
+        return None, "", sc
+    for h in hooks:
+        u = (h.get("config", {}) or {}).get("url", "")
+        if "/hook-" in u:
+            return h.get("id"), u, sc
+    return None, "", sc
+
+
+def gh_hook_sincronizar(repo: str) -> str:
+    """Cria ou aponta o webhook do repo para a campainha ATUAL."""
+    alvo = webhook_url_atual()
+    if not alvo:
+        return "⚠️ kit do webhook não instalado neste servidor"
+    try:
+        segredo = (Path.home() / ".vps_webhook_secret").read_text().strip()
+    except Exception:
+        return "⚠️ sem ~/.vps_webhook_secret"
+    cfg_h = {"url": alvo, "content_type": "json", "secret": segredo}
+    hid, hurl, _ = gh_hook_do_repo(repo)
+    if hid:
+        sc, _r = _gh_api("PATCH", f"/repos/{GIT_USER}/{repo}/hooks/{hid}",
+                         {"config": cfg_h, "events": ["push"], "active": True})
+        ok = sc == 200
+        msg = ("🟢 segredo/URL renovados" if hurl == alvo
+               else "🔁 apontado pra campainha NOVA")
+        return msg if ok else f"erro {sc}"
+    sc, _r = _gh_api("POST", f"/repos/{GIT_USER}/{repo}/hooks",
+                     {"config": cfg_h, "events": ["push"], "active": True})
+    return "🟢 conectado" if sc == 201 else f"erro {sc}"
+
+
+def gh_hook_desconectar(repo: str) -> str:
+    hid, _, _ = gh_hook_do_repo(repo)
+    if not hid:
+        return "não tinha campainha"
+    sc, _r = _gh_api("DELETE", f"/repos/{GIT_USER}/{repo}/hooks/{hid}")
+    return "✂️ desconectado" if sc == 204 else f"erro {sc}"
+
+
 def git_deploy(repo: str, conf: dict) -> tuple[bool, str]:
     """Atualiza producao: modo 'pull' (pasta e clone) ou modo 'mapa' (clona e espalha)."""
     import shutil
@@ -1308,6 +1379,50 @@ elif pagina == "🌿 Git & Deploys":
                              f"`{m:02d}:{s2:02d}` · rede de segurança do webhook</small>",
                              unsafe_allow_html=True)
     _status_deploy()
+
+    with st.expander("🪝 Campainha — conectar webhooks / migrar de servidor"):
+        st.caption(
+            "A campainha é **uma só** (rota secreta + segredo HMAC, vivem neste "
+            "servidor). Cada repo do GitHub aponta pra ela. **Migrou de servidor "
+            "ou domínio?** Instale o kit (`infra/INSTALL_WEBHOOK.md`) no novo e "
+            "clique 🔁 abaixo — todos os repos passam a tocar a campainha nova."
+        )
+        _url_alvo = webhook_url_atual()
+        if not _url_alvo:
+            st.warning("Kit do webhook não instalado aqui (sem ~/.vps_webhook_rota). "
+                       "Receita: infra/INSTALL_WEBHOOK.md no repo do painel.")
+        else:
+            st.markdown(f"<small>📍 campainha deste servidor: `{_url_alvo}`</small>",
+                        unsafe_allow_html=True)
+            if st.button("🔁 Conectar/atualizar TODOS os repos para esta campainha",
+                         type="primary", use_container_width=True):
+                for _r in todos_git_projetos():
+                    st.write(f"`{_r}`: {gh_hook_sincronizar(_r)}")
+                gh_hook_do_repo.clear()
+            st.divider()
+            for _r in todos_git_projetos():
+                _hid, _hurl, _sc = gh_hook_do_repo(_r)
+                if _sc != 200:
+                    _situ_h = f"🟡 GitHub: {_sc or 'sem acesso'} (token precisa da permissão Webhooks)"
+                elif not _hid:
+                    _situ_h = "⚪ sem campainha (push NÃO avisa este servidor)"
+                elif _hurl == _url_alvo:
+                    _situ_h = "🟢 conectado nesta campainha"
+                else:
+                    _situ_h = "🟠 aponta pra OUTRA campainha (servidor antigo?)"
+                _cA, _cB, _cC = st.columns([3.6, 1.1, 1.3],
+                                           vertical_alignment="center")
+                _cA.markdown(f"`{_r}` · {_situ_h}")
+                if _cB.button("🔗 Conectar", key=f"whc_{_r}",
+                              use_container_width=True):
+                    st.toast(f"{_r}: {gh_hook_sincronizar(_r)}")
+                    gh_hook_do_repo.clear()
+                    st.rerun()
+                if _cC.button("✂️ Desconectar", key=f"whd_{_r}",
+                              use_container_width=True):
+                    st.toast(f"{_r}: {gh_hook_desconectar(_r)}")
+                    gh_hook_do_repo.clear()
+                    st.rerun()
 
     # popovers ⋯ compactos e uniformes (todos no tamanho MENOR)
     st.markdown("<style>div[data-testid='stPopoverBody']"
