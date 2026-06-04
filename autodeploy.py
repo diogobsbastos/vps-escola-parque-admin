@@ -88,6 +88,11 @@ def main() -> None:
             if rc2 != 0:
                 print(f"{repo}: pull falhou: {out2[-200:]}")
                 continue
+            if conf.get("build"):
+                rc3, out3 = run(["bash", "-c", f"cd {pasta} && " + conf["build"]], 900)
+                if rc3 != 0:
+                    print(f"{repo}: BUILD falhou, NADA reiniciado: {out3[-200:]}")
+                    continue
         else:
             try:
                 est_l = json.loads(STATE.read_text()).get(repo, {}).get("commit", "")

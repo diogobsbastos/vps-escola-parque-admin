@@ -604,6 +604,12 @@ def git_deploy(repo: str, conf: dict) -> tuple[bool, str]:
                         "pull", "--ff-only"], timeout=180)
         if rc != 0:
             return False, "pull falhou: " + out[-300:]
+        if conf.get("build"):
+            rc_b, out_b = _run(["bash", "-c", f"cd {pasta} && " + conf["build"]],
+                               timeout=900)
+            if rc_b != 0:
+                return False, ("BUILD falhou — produção segue na versão anterior "
+                               "(nada foi reiniciado): " + out_b[-300:])
         _, h = _run(["git", "-C", pasta, "rev-parse", "--short=10", "HEAD"])
         est = git_estado()
         est[repo] = {"commit": (h or "?").strip(), "quando": time.strftime("%Y-%m-%d %H:%M")}
@@ -1185,6 +1191,12 @@ elif pagina == "🌿 Git & Deploys":
                                            placeholder="/home/ubuntu/sertanejo-lab")
                 svc_novos = f4.multiselect("Serviços a reiniciar no deploy",
                                            list(todos_servicos().keys()))
+                build_novo = st.text_input(
+                    "Comando de build (opcional — apps compilados, ex. Next.js)",
+                    placeholder="npm install && npm run build",
+                    help="Roda na pasta APÓS o pull e ANTES do restart. Se falhar, "
+                         "nada é reiniciado (a produção continua na versão antiga).",
+                )
                 ok_repo = st.form_submit_button("Conectar 🌿", type="primary")
             if ok_repo and repo_novo.strip() and pasta_nova.strip():
                 extras_r = git_projetos_extras()
@@ -1193,6 +1205,8 @@ elif pagina == "🌿 Git & Deploys":
                     "pull": pasta_nova.strip(),
                     "servicos": svc_novos,
                 }
+                if build_novo.strip():
+                    extras_r[repo_novo.strip()]["build"] = build_novo.strip()
                 if salvar_git_projetos(extras_r):
                     st.session_state["form_repo"] = False
                     st.rerun()
