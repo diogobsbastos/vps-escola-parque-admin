@@ -1024,6 +1024,19 @@ def dialog_console_sql() -> None:
                 st.error(out_q[:1000])
 
 
+KIT_REST_LOCAL = r"""sudo tee /etc/nginx/sites-available/local-rest >/dev/null <<'EOF'
+server {
+    listen 127.0.0.1:8088;
+    location /rest/v1/ { proxy_pass http://127.0.0.1:3001/; }
+    location /db/ { proxy_pass http://127.0.0.1:3001/; }
+}
+EOF
+sudo ln -sf /etc/nginx/sites-available/local-rest /etc/nginx/sites-enabled/local-rest
+sudo nginx -t && sudo systemctl reload nginx
+curl -s -o /dev/null -w "REST local: HTTP %{http_code}\n" http://127.0.0.1:8088/rest/v1/
+"""
+
+
 ROTEIRO_MIGRACAO = """
 **0️⃣ GitHub novo** *(só se mudar de conta — ex.: cliente/sócio)* — crie a conta,
 suba os repos do framework (`git push` a partir dos clones atuais) e gere um
@@ -2357,8 +2370,8 @@ elif pagina == "🐘 Supabase VPS":
                            ("" if _eh_adm else " · acesso direto 5432")) + "</small>",
                         unsafe_allow_html=True,
                     )
-                    if cb2.button("Abrir 🗄️", key=f"abrir_{b['banco']}",
-                                  type="primary", use_container_width=True):
+                    if cb2.button("📂 Abrir", key=f"abrir_{b['banco']}",
+                                  use_container_width=True):
                         st.session_state["bd_aberto"] = b["banco"]
                         st.rerun()
 
@@ -2402,23 +2415,34 @@ elif pagina == "🐘 Supabase VPS":
                         st.warning("Segredo do PostgREST não encontrado "
                                    "(~/.postgrest_jwt_secret) — FASE 2.5.")
                     else:
-                        st.caption("Ficha pro Multi-Pool / apps externos — formato "
-                                   "Supabase. ⚠️ mostra segredos (painel logado).")
+                        st.caption("⚠️ mostra segredos (painel logado). Duas "
+                                   "fichas: 🌍 app FORA da VPS · 🏠 app NESTA VPS "
+                                   "(conexão local — não sai pra internet pra voltar).")
+                        st.markdown("**🌍 Apps EXTERNOS (fora desta VPS)**")
                         st.code(
-                            f"Label        : 🏠 VPS Interno (local)\n"
+                            f"Label        : 🏠 VPS Interno\n"
                             f"Supabase URL : {URL_BASE}\n"
                             f"Project ID   : vps-interno\n"
                             f"Region       : vps-local\n"
                             f"Anon Key     : {_anon}\n"
                             f"Service Key  : {_serv}\n"
-                            f"DB Password  : {_w.get('pass', '?')}\n"
-                            f"Database URL : postgres://{_w.get('user', '?')}:"
+                            f"DB Password  : {_w.get('pass', '?')}",
+                            language="text")
+                        st.caption(f"REST: `GET {URL_BASE}/rest/v1/<tabela>` com "
+                                   "headers `apikey` + `Authorization: Bearer <key>`.")
+                        st.markdown("**🏠 Apps NESTA VPS (preferir — latência ~0)**")
+                        st.code(
+                            f"Supabase URL : http://127.0.0.1:8088  (REST local — "
+                            f"requer listener, kit abaixo)\n"
+                            f"Anon/Service : as MESMAS chaves acima\n"
+                            f"Worker/Python: postgres://{_w.get('user', '?')}:"
                             f"{_w.get('pass', '?')}@127.0.0.1:5432/innova\n"
                             f"App (Drizzle): postgres://{_a.get('user', '?')}:"
                             f"{_a.get('pass', '?')}@127.0.0.1:5432/innova",
                             language="text")
-                        st.caption(f"REST: `GET {URL_BASE}/rest/v1/<tabela>` com "
-                                   "headers `apikey` + `Authorization: Bearer <key>`.")
+                        with st.expander("🔧 Kit do REST local (rodar 1x — só se "
+                                         "for usar cliente Supabase DENTRO da VPS)"):
+                            st.code(KIT_REST_LOCAL, language="bash")
                 else:
                     st.caption("Banco sem API REST (a /rest/v1 serve o `innova`). "
                                "Acesso direto na porta local 5432:")
@@ -2573,9 +2597,11 @@ elif pagina == "🐘 Supabase VPS":
         with st.expander("🧾 Log das execuções (timer + manuais)"):
             _rc_lg, _out_lg = _run(["journalctl", "-u", "vpsbackup", "-n", "60",
                                     "--no-pager", "-o", "short-iso"], timeout=8)
-            st.code(((_out_lg or "").strip()
-                     or "sem registros ainda — instale/ative o timer vpsbackup "
-                        "(kit no handoff)")[-4000:], language="text")
+            with st.container(height=260):
+                st.code(((_out_lg or "").strip()
+                         or "sem registros ainda — instale/ative o timer "
+                            "vpsbackup (kit no handoff)")[-4000:],
+                        language="text")
             st.caption("O timer dispara TODA hora (xx:30); cada perfil executa "
                        "só no horário dele. \"nenhum perfil no horário\" = "
                        "ronda vazia, normal. Execuções manuais (▶ Agora) não "
