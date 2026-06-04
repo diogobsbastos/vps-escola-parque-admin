@@ -2213,30 +2213,31 @@ elif pagina == "🧠 IA & LLMs":
 # ============================================================
 
 elif pagina == "🐘 Supabase VPS":
-    c_t, c_nb, c_sq = st.columns([3.2, 1.4, 1.3], vertical_alignment="center")
-    with c_t:
-        st.title("🐘 Supabase VPS")
-    with c_nb:
-        _f_nb = bool(st.session_state.get("form_novo_banco"))
-        if st.button("✖ Fechar formulário" if _f_nb else "➕ Novo banco",
-                     type="secondary" if _f_nb else "primary",
-                     use_container_width=True):
-            st.session_state["form_novo_banco"] = not _f_nb
-            st.rerun()
-    with c_sq:
-        if st.button("🧰 Console SQL", use_container_width=True):
-            dialog_console_sql()
+    st.title("🐘 Supabase VPS")
     st.markdown(ABAS_CSS, unsafe_allow_html=True)
     _pg_on = status_servico("postgresql") == "active"
     _api_on = status_servico("postgrest") == "active"
     st.caption(f"PostgreSQL 17 {'🟢' if _pg_on else '🔴'} · API REST (PostgREST) "
                f"{'🟢' if _api_on else '🔴'} · nosso banco com endereço e chaves, "
-               "sem mensalidade. Clique num banco pra ver tabelas e chaves.")
+               "sem mensalidade.")
     if not db_cred():
         st.warning("Sem ~/.innova_db.json — rode a FASE 1 do banco interno (handoff).")
 
     tab_bd, tab_bk = st.tabs(["🗄️ Banco de Dados", "💾 Backups"])
     with tab_bd:
+        c_bd1, c_bd2, c_bd3 = st.columns([3.9, 1.4, 1.3],
+                                         vertical_alignment="center")
+        c_bd1.caption("Clique num banco pra ver tabelas, chaves e usuários.")
+        with c_bd2:
+            _f_nb = bool(st.session_state.get("form_novo_banco"))
+            if st.button("✖ Fechar formulário" if _f_nb else "➕ Novo banco",
+                         type="secondary" if _f_nb else "primary",
+                         use_container_width=True):
+                st.session_state["form_novo_banco"] = not _f_nb
+                st.rerun()
+        with c_bd3:
+            if st.button("🧰 Console SQL", use_container_width=True):
+                dialog_console_sql()
         if st.session_state.get("form_novo_banco"):
             with st.container(border=True):
                 st.markdown("**Criar um banco novo no Postgres local** (com pgvector; "
