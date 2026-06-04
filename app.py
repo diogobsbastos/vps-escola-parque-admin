@@ -735,7 +735,11 @@ with st.sidebar:
         "👤 Conta",
     ]
     if "pagina" not in st.session_state:
-        st.session_state["pagina"] = PAGINAS[0]
+        try:
+            _pq = st.query_params.get("p")
+        except Exception:
+            _pq = None
+        st.session_state["pagina"] = _pq if _pq in PAGINAS else PAGINAS[0]
     for _p in PAGINAS:
         if st.button(
             _p,
@@ -744,6 +748,10 @@ with st.sidebar:
             key=f"nav_{_p}",
         ):
             st.session_state["pagina"] = _p
+            try:
+                st.query_params["p"] = _p
+            except Exception:
+                pass
             st.rerun()
     pagina = st.session_state["pagina"]
 
@@ -1098,9 +1106,10 @@ elif pagina == "🌿 Git & Deploys":
                                         vertical_alignment="center")
             c1.markdown(
                 f"**{conf['rotulo']}**  \n"
-                f"`{repo}` · GitHub `{remoto}` · produção `{local}` "
-                f"({info.get('quando', 'nunca')})  \n"
-                f"{situ}"
+                f"`{repo}` · GitHub `{remoto}` · produção `{local}`  \n"
+                f"{situ} <small><span style='color:#9ca3af'>· "
+                f"{info.get('quando', 'sem registro')}</span></small>",
+                unsafe_allow_html=True,
             )
             _auto_atual = bool(conf.get("auto"))
             _auto = c0.toggle("⚙️ auto", value=_auto_atual, key=f"auto_{repo}",
