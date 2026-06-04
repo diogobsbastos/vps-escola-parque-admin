@@ -351,6 +351,29 @@ def listar_bibliotecas() -> dict[str, list[dict]]:
     return res
 
 
+@st.cache_data(ttl=600, show_spinner=False)
+def stack_node(pasta: str) -> str:
+    """Resumo da stack de um app Node (deps principais do package.json)."""
+    try:
+        dep = json.loads((Path(pasta) / "package.json").read_text()
+                         ).get("dependencies", {}) or {}
+    except Exception:
+        return ""
+    princ = ["next", "react", "drizzle-orm", "@supabase/supabase-js",
+             "tailwindcss", "typescript", "zod"]
+    itens = [f"{p.split('/')[-1]} {str(dep[p]).lstrip('^~')}"
+             for p in princ if p in dep]
+    resto = len(dep) - sum(1 for p in princ if p in dep)
+    if not itens:
+        return ""
+    return "🧩 " + " · ".join(itens) + (f" · +{resto} libs" if resto > 0 else "")
+
+
+STACK_SERVICO = {  # servico -> pasta do app Node (mostra a stack no Dashboard)
+    "innovafront": "/home/ubuntu/innova-front",
+}
+
+
 # ============================================================
 # Helpers — usuario
 # ============================================================
@@ -1042,15 +1065,34 @@ if pagina == "📊 Dashboard":
         c4.metric("Load (1/5/15m)", carga)
 
     st.divider()
-    st.subheader("🚦 Visao geral dos serviços")
-    cols = st.columns(3)
-    for i, (nome, rotulo) in enumerate(todos_servicos().items()):
-        stt = status_servico(nome)
-        cor = {"active": "🟢", "inactive": "⚪", "failed": "🔴"}.get(stt, "🟡")
-        with cols[i % 3]:
-            with st.container(border=True):
-                st.markdown(f"**{cor} {rotulo}**")
-                st.caption(f"`{nome}` · {stt}")
+    st.subheader("🚦 Visão geral dos serviços")
+    REGIOES = [
+        ("🏫 Escola Parque", ["escolaparque", "escolaparque-worker"]),
+        ("🚀 Frontend (Innova Exams)", ["innovafront"]),
+        ("🎸 Sertanejo", ["sertanejolab"]),
+        ("🧰 Infra & IA", ["vpsadmin", "nginx", "ollama", "llmgateway", "vpsmcp"]),
+    ]
+    _svcs = todos_servicos()
+    _agrupados = {s for _, _ss in REGIOES for s in _ss}
+    _sobras = [s for s in _svcs if s not in _agrupados]
+    if _sobras:
+        REGIOES.append(("📦 Outros apps", _sobras))
+    for _reg, _lista in REGIOES:
+        _lista = [s for s in _lista if s in _svcs]
+        if not _lista:
+            continue
+        st.markdown(f"##### {_reg}")
+        cols = st.columns(3)
+        for i, nome in enumerate(_lista):
+            stt = status_servico(nome)
+            cor = {"active": "🟢", "inactive": "⚪", "failed": "🔴"}.get(stt, "🟡")
+            with cols[i % 3]:
+                with st.container(border=True):
+                    st.markdown(f"**{cor} {_svcs[nome]}**")
+                    _stk = (stack_node(STACK_SERVICO[nome])
+                            if nome in STACK_SERVICO else "")
+                    st.caption(f"`{nome}` · {stt}"
+                               + (f"  \n{_stk}" if _stk else ""))
 
     st.divider()
     st.subheader("🌿 Git & Deploys")
@@ -1404,7 +1446,11 @@ elif pagina == "🌿 Git & Deploys":
                 if build_novo.strip():
                     extras_r[repo_novo.strip()]["build"] = build_novo.strip()
                 if salvar_git_projetos(extras_r):
+                    _msg_hook = gh_hook_sincronizar(repo_novo.strip())
+                    gh_hook_do_repo.clear()
+                    st.toast(f"🪝 campainha do repo novo: {_msg_hook}")
                     st.session_state["form_repo"] = False
+                    time.sleep(1.2)
                     st.rerun()
                 else:
                     st.error("Falha ao salvar o registro.")
