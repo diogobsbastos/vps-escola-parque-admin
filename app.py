@@ -511,15 +511,16 @@ def git_situ_curta(repo: str, conf: dict) -> str:
 
 
 def autodeploy_proximo() -> int | None:
-    """Segundos ate a proxima ronda do vigia (None = timer nao instalado)."""
-    rc, out = _run(["systemctl", "show", "vpsautodeploy.timer",
-                    "-p", "NextElapseUSecRealtime", "--value"], timeout=5)
+    """Segundos ate a proxima ronda do vigia (None = timer nao instalado).
+    Timer usa relogio MONOTONICO (OnUnitActiveSec) -> ler via list-timers."""
+    rc, out = _run(["systemctl", "list-timers", "vpsautodeploy.timer",
+                    "--no-pager", "--no-legend"], timeout=5)
     out = (out or "").strip()
-    if rc != 0 or not out or out in ("n/a", "infinity"):
+    if rc != 0 or not out:
         return None
     from datetime import datetime
     try:
-        partes = out.split()  # ex.: ['Thu', '2026-06-04', '04:02:48', '-03']
+        partes = out.split()  # ['Thu','2026-06-04','04:04:48','-03','1min','17s','left',...]
         alvo = datetime.strptime(partes[1] + " " + partes[2], "%Y-%m-%d %H:%M:%S")
         return max(0, int((alvo - datetime.now()).total_seconds()))
     except Exception:
