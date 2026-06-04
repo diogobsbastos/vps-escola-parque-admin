@@ -2302,13 +2302,16 @@ elif pagina == "🐘 Supabase VPS":
             with st.container(border=True):
                 cb1, cb2 = st.columns([4.4, 1.3], vertical_alignment="center")
                 _eh_innova = b["banco"] == "innova"
+                _eh_adm = b["banco"] == "postgres"
                 cb1.markdown(
-                    f"**🗄️ {b['banco']}**"
+                    f"**{'⚙️' if _eh_adm else '🗄️'} {b['banco']}**"
                     + (" · 🏠 banco do sistema (Innova/Escola Parque)"
                        if _eh_innova else "")
+                    + (" · banco administrativo do motor (vem de fábrica — "
+                       "não usar pra dados)" if _eh_adm else "")
                     + f"  \n<small>dono `{b['dono']}` · {b['tamanho']}"
                     + (" · API REST /rest/v1 ativa" if _eh_innova else
-                       " · acesso direto 5432") + "</small>",
+                       ("" if _eh_adm else " · acesso direto 5432")) + "</small>",
                     unsafe_allow_html=True,
                 )
                 if cb2.button("Abrir 🗄️", key=f"abrir_{b['banco']}",
