@@ -803,6 +803,82 @@ echo "campainha instalada — volte ao painel e clique 🔁"
 """
 
 
+@st.dialog("🪝 Webhook — a campainha do push→deploy", width="large")
+def dialog_webhook() -> None:
+    st.caption(
+        "A campainha é **uma só por servidor** (rota secreta + segredo HMAC). "
+        "Cada repo do GitHub aponta pra ela — push = deploy em ~5s. "
+        "Tudo aqui é feito **via API**, sem abrir o site do GitHub."
+    )
+    if st.toggle("📦 Roteiro: levar o framework pra OUTRO VPS / OUTRO GitHub",
+                 key="rot_mig_dlg"):
+        st.markdown(ROTEIRO_MIGRACAO)
+        st.code(KIT_CAMPAINHA, language="bash")
+        st.markdown(
+            "**4️⃣ Religar:** painel novo → 🪝 Webhook → **🔁**. Os webhooks são "
+            "criados **na conta nova, via API**. ✅"
+        )
+        st.divider()
+    url_alvo = webhook_url_atual()
+    if not url_alvo:
+        st.warning("⚪ Campainha ainda NÃO instalada neste servidor — normal em "
+                   "servidor recém-migrado. Cole o bloco abaixo no SSH (1x) e "
+                   "reabra este popup.")
+        st.code(KIT_CAMPAINHA, language="bash")
+        return
+    st.markdown(f"<small>📍 campainha deste servidor: `{url_alvo}` · serviço "
+                f"{'🟢' if webhook_ativo() else '🔴'} `vpswebhook`</small>",
+                unsafe_allow_html=True)
+    if st.button("🔁 Conectar/atualizar TODOS os repos para esta campainha",
+                 type="primary", use_container_width=True):
+        for r in todos_git_projetos():
+            st.write(f"`{r}`: {gh_hook_sincronizar(r)}")
+        gh_hook_do_repo.clear()
+    st.divider()
+    for r in todos_git_projetos():
+        hid, hurl, sc = gh_hook_do_repo(r)
+        if st.session_state.get(f"whconf_{r}"):
+            cw1, cw2, cw3 = st.columns([3.0, 1.5, 1.2],
+                                       vertical_alignment="center")
+            cw1.markdown(f"`{r}` · ⚠️ **desconectar do GitHub?**")
+            if cw2.button("✔ Sim, desconectar", key=f"whsim_{r}",
+                          type="primary", use_container_width=True):
+                st.toast(f"{r}: {gh_hook_desconectar(r)}")
+                st.session_state.pop(f"whconf_{r}", None)
+                gh_hook_do_repo.clear()
+                st.rerun(scope="fragment")
+            if cw3.button("✖ Cancelar", key=f"whnao_{r}",
+                          use_container_width=True):
+                st.session_state.pop(f"whconf_{r}", None)
+                st.rerun(scope="fragment")
+            continue
+        if sc != 200:
+            situ_h = f"🟡 GitHub: {sc or 'sem acesso'} (token com permissão Webhooks?)"
+        elif not hid:
+            situ_h = "⚪ sem campainha (push NÃO avisa este servidor)"
+        elif hurl == url_alvo:
+            situ_h = "🟢 conectado nesta campainha"
+        else:
+            situ_h = "🟠 aponta pra OUTRA campainha (servidor antigo?)"
+        cA, cB = st.columns([4.7, 1.3], vertical_alignment="center")
+        cA.markdown(f"`{r}` · {situ_h}")
+        if bool(hid) and hurl == url_alvo:
+            if cB.button("✂️ Desconectar", key=f"whd_{r}",
+                         use_container_width=True,
+                         help="Pede confirmação. Remove o webhook no GitHub — "
+                              "sobra só a ronda de 2 min."):
+                st.session_state[f"whconf_{r}"] = True
+                st.rerun(scope="fragment")
+        else:
+            if cB.button("🔗 Conectar", key=f"whc_{r}", type="primary",
+                         use_container_width=True,
+                         help="Cria/aponta o webhook deste repo pra campainha "
+                              "deste servidor — via API."):
+                st.toast(f"{r}: {gh_hook_sincronizar(r)}")
+                gh_hook_do_repo.clear()
+                st.rerun(scope="fragment")
+
+
 ROTEIRO_MIGRACAO = """
 **0️⃣ GitHub novo** *(só se mudar de conta — ex.: cliente/sócio)* — crie a conta,
 suba os repos do framework (`git push` a partir dos clones atuais) e gere um
@@ -1435,7 +1511,13 @@ sudo certbot --nginx -d {_d} --redirect -m diogobsbastos@gmail.com --agree-tos -
 # ============================================================
 
 elif pagina == "🌿 Git & Deploys":
-    c_t, c_add, c_gh = st.columns([3.6, 1.5, 1.2], vertical_alignment="center")
+    c_t, c_add, c_wh, c_gh = st.columns([3.0, 1.4, 1.1, 1.0],
+                                        vertical_alignment="center")
+    with c_wh:
+        if st.button("🪝 Webhook", use_container_width=True,
+                     help="Campainha do push→deploy: status por repo, "
+                          "conectar/desconectar e kit de migração."):
+            dialog_webhook()
     with c_t:
         st.title("🌿 Git & Deploys")
     with c_add:
@@ -1531,94 +1613,6 @@ elif pagina == "🌿 Git & Deploys":
                              f"`{m:02d}:{s2:02d}` · rede de segurança do webhook</small>",
                              unsafe_allow_html=True)
     _status_deploy()
-
-    with st.expander("🪝 Campainha — conectar webhooks / migrar de servidor"):
-        st.caption(
-            "A campainha é **uma só por servidor** (rota secreta + segredo HMAC). "
-            "Cada repo do GitHub aponta pra ela — e o GitHub avisa o servidor a "
-            "cada push (deploy ~5s). **Migração de servidor em 3 passos:** "
-            "1️⃣ painel novo no ar (o `webhook.py` já vem junto via git) · "
-            "2️⃣ colar o kit da campainha que aparece AQUI quando falta · "
-            "3️⃣ clicar 🔁 — todos os repos passam a tocar a campainha nova, "
-            "sem abrir o GitHub."
-        )
-        if st.toggle("📦 **Roteiro completo: levar o framework pra OUTRO VPS "
-                     "/ OUTRO GitHub**", key="rot_mig"):
-            st.markdown(ROTEIRO_MIGRACAO)
-            st.code(KIT_CAMPAINHA, language="bash")
-            st.markdown(
-                "**4️⃣ Religar:** abra o painel novo → 🌿 → 🪝 → **🔁 Conectar/"
-                "atualizar TODOS**. Os webhooks são criados **na conta nova, "
-                "via API** — você não abre o site do GitHub pra nada. ✅"
-            )
-            st.divider()
-        _url_alvo = webhook_url_atual()
-        if not _url_alvo:
-            st.warning("⚪ Campainha ainda NÃO instalada neste servidor — normal em "
-                       "servidor recém-migrado. Cole o bloco abaixo no SSH (1x). "
-                       "Quando terminar, esta seção vira os botões de conexão.")
-            st.code(KIT_CAMPAINHA, language="bash")
-        else:
-            st.markdown(f"<small>📍 campainha deste servidor: `{_url_alvo}`</small>",
-                        unsafe_allow_html=True)
-            if st.button("🔁 Conectar/atualizar TODOS os repos para esta campainha",
-                         type="primary", use_container_width=True):
-                for _r in todos_git_projetos():
-                    st.write(f"`{_r}`: {gh_hook_sincronizar(_r)}")
-                gh_hook_do_repo.clear()
-            st.divider()
-            for _r in todos_git_projetos():
-                _hid, _hurl, _sc = gh_hook_do_repo(_r)
-                if _sc != 200:
-                    _situ_h = f"🟡 GitHub: {_sc or 'sem acesso'} (token precisa da permissão Webhooks)"
-                elif not _hid:
-                    _situ_h = "⚪ sem campainha (push NÃO avisa este servidor)"
-                elif _hurl == _url_alvo:
-                    _situ_h = "🟢 conectado nesta campainha"
-                else:
-                    _situ_h = "🟠 aponta pra OUTRA campainha (servidor antigo?)"
-                _cA, _cB = st.columns([4.7, 1.3], vertical_alignment="center")
-                _cA.markdown(f"`{_r}` · {_situ_h}")
-                if bool(_hid) and _hurl == _url_alvo:
-                    if _cB.button("✂️ Desconectar", key=f"whd_{_r}",
-                                  use_container_width=True,
-                                  help="Remove o webhook deste repo no GitHub. "
-                                       "O push deixa de avisar na hora (sobra "
-                                       "só a ronda de 2 min)."):
-                        st.toast(f"{_r}: {gh_hook_desconectar(_r)}")
-                        gh_hook_do_repo.clear()
-                        st.rerun()
-                else:
-                    if _cB.button("🔗 Conectar", key=f"whc_{_r}", type="primary",
-                                  use_container_width=True,
-                                  help="Cria/aponta o webhook deste repo para a "
-                                       "campainha deste servidor — via API, sem "
-                                       "abrir o GitHub."):
-                        st.toast(f"{_r}: {gh_hook_sincronizar(_r)}")
-                        gh_hook_do_repo.clear()
-                        st.rerun()
-
-    # popovers ⋯ compactos e uniformes (todos no tamanho MENOR)
-    st.markdown("<style>div[data-testid='stPopoverBody']"
-                "{width:min(380px,92vw);min-width:0;}"
-                "div[data-testid='stPopoverBody'] [data-testid='stVerticalBlock']"
-                "{max-width:100%;}"
-                "div[data-testid='stPopover'] button svg,"
-                "div[data-testid='stPopover'] button [data-testid='stIconMaterial']"
-                "{display:none;}"
-                "div[data-testid='stPopover']"
-                "{display:flex;justify-content:center;}"
-                "div[data-testid='stPopover'] button"
-                "{position:relative;padding:0;overflow:hidden;"
-                "width:2.1rem;min-width:2.1rem;max-width:2.1rem;"
-                "min-height:2.1rem;height:2.1rem;border-radius:0.5rem;}"
-                "div[data-testid='stPopover'] button *"
-                "{margin:0;padding:0;}"
-                "div[data-testid='stPopover'] button p"
-                "{position:absolute;top:50%;left:50%;"
-                "transform:translate(-50%,-50%);line-height:1;"
-                "font-size:1.05rem;}</style>",
-                unsafe_allow_html=True)
 
     estado = git_estado()
     _extras_git = git_projetos_extras()
