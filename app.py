@@ -2702,13 +2702,42 @@ elif pagina == "🐘 Supabase VPS":
             _rc_lg, _out_lg = _run(["journalctl", "-u", _fontes[_f_lg], "-n",
                                     str(_n_lg), "--no-pager", "-o", "short-iso"],
                                    timeout=8)
-            with st.container(height=420):
-                st.code(((_out_lg or "").strip()
-                         or "sem registros ainda")[-12000:], language="text")
-            st.caption("🔄 atualiza sozinho a cada 6s · o timer do backup roda "
-                       "toda hora (xx:30) — \"nenhum perfil no horário\" é "
-                       "ronda vazia, normal · execuções manuais (▶ Agora) "
-                       "aparecem no 🧾 do card do perfil.")
+            _txt_lg = (_out_lg or "").strip()
+
+            def _data_br(iso: str) -> str:
+                """2026-06-04T08:30:24-0300 -> 04/06/2026 08:30"""
+                try:
+                    d, h = iso.split("T")
+                    a, m, dd = d.split("-")
+                    return f"{dd}/{m}/{a} {h[:5]}"
+                except Exception:
+                    return iso
+
+            if _fontes[_f_lg] == "vpsbackup" and _txt_lg:
+                _blocos, _atual = [], []
+                for _ln in _txt_lg.splitlines():
+                    if "Starting VPS Backup" in _ln and _atual:
+                        _blocos.append(_atual)
+                        _atual = []
+                    _atual.append(_ln)
+                if _atual:
+                    _blocos.append(_atual)
+                for _b in reversed(_blocos[-30:]):
+                    _quando = _data_br(_b[0].split()[0]) if _b else "?"
+                    _resumo = next(
+                        (l.split("]: ", 1)[-1] for l in _b if "python3[" in l),
+                        "(sem saída do script)")
+                    _icone = ("✅" if "✅" in _resumo else
+                              "❌" if "❌" in _resumo else "💤")
+                    with st.expander(f"{_icone} {_quando} — {_resumo[:100]}"):
+                        st.code("\n".join(_b), language="text")
+            else:
+                with st.container(height=420):
+                    st.code((_txt_lg or "sem registros ainda")[-12000:],
+                            language="text")
+            st.caption("🔄 atualiza sozinho a cada 6s · 💤 = ronda vazia (o "
+                       "timer passa toda hora e ninguém estava no horário — "
+                       "normal) · clique numa linha pra abrir os detalhes.")
         _logs_banco()
 
 
