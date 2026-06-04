@@ -1128,7 +1128,7 @@ elif pagina == "🌿 Git & Deploys":
                     st.rerun()
                 else:
                     st.error("Deploy falhou: " + msg)
-            if repo in _extras_git:
+            if repo in _extras_git and repo not in GIT_PROJETOS:
                 if st.button("🗑️ Desconectar do painel (não apaga nada)",
                              key=f"unrepo_{repo}"):
                     _extras_git.pop(repo, None)
