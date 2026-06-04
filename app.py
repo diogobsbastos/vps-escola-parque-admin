@@ -1504,7 +1504,31 @@ if pagina == "📊 Dashboard":
         c4.caption("média de processos na fila")
 
     st.divider()
-    st.subheader("🚦 Visão geral dos serviços")
+    st.subheader("📱 Apps")
+    _svcs = todos_servicos()
+    _apps_web = [n for n in _svcs if url_acesso(n)]
+    cols_a = st.columns(min(4, max(1, len(_apps_web))))
+    for i, nome in enumerate(_apps_web):
+        stt = status_servico(nome)
+        cor = {"active": "🟢", "inactive": "⚪", "failed": "🔴"}.get(stt, "🟡")
+        _stk = (stack_node(STACK_SERVICO[nome])
+                if nome in STACK_SERVICO else "")
+        with cols_a[i % len(cols_a)]:
+            with st.container(border=True):
+                st.markdown(
+                    f"**{cor} {_svcs[nome]}**  \n"
+                    f"<small>`{nome}` · {stt}"
+                    + (f"  \n{_stk}" if _stk else "") + "</small>"
+                    f"<div style='text-align:right;margin-top:6px'>"
+                    f"<a href='{url_acesso(nome)}' target='_blank' "
+                    f"style='text-decoration:none;background:#f9fafb;"
+                    f"border:1px solid #d1d5db;border-radius:8px;"
+                    f"padding:3px 12px;color:#111827'>↗</a></div>",
+                    unsafe_allow_html=True,
+                )
+
+    st.divider()
+    st.subheader("🚦 Serviços")
     REGIOES = [
         ("🏫 Escola Parque", ["escolaparque", "escolaparque-worker"]),
         ("🚀 Frontend (Innova Exams)", ["innovafront"]),
@@ -1512,14 +1536,14 @@ if pagina == "📊 Dashboard":
         ("🧰 Infra & IA", ["vpsadmin", "nginx", "ollama", "llmgateway",
                            "vpsmcp", "vpswebhook", "postgresql", "postgrest"]),
     ]
-    _svcs = todos_servicos()
     _agrupados = {s for _, _ss in REGIOES for s in _ss}
     _sobras = [s for s in _svcs if s not in _agrupados]
     if _sobras:
         REGIOES.append(("📦 Outros apps", _sobras))
     _CORES_REG = {"🏫": "#dbeafe", "🚀": "#fee2e2", "🎸": "#fef9c3",
                   "🧰": "#e5e7eb", "📦": "#f3e8ff"}
-    _ordem = [(reg, s) for reg, ss in REGIOES for s in ss if s in _svcs]
+    _ordem = [(reg, s) for reg, ss in REGIOES for s in ss
+              if s in _svcs and not url_acesso(s)]
     cols = st.columns(3)
     for i, (_reg, nome) in enumerate(_ordem):
         stt = status_servico(nome)
@@ -1534,10 +1558,7 @@ if pagina == "📊 Dashboard":
                     f"vertical-align:middle'>{_reg}</span>",
                     unsafe_allow_html=True,
                 )
-                _stk = (stack_node(STACK_SERVICO[nome])
-                        if nome in STACK_SERVICO else "")
-                st.caption(f"`{nome}` · {stt}"
-                           + (f"  \n{_stk}" if _stk else ""))
+                st.caption(f"`{nome}` · {stt}")
 
     st.divider()
     st.subheader("🌿 Git & Deploys")
