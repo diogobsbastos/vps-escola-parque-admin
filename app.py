@@ -350,7 +350,7 @@ def listar_bibliotecas() -> dict[str, list[dict]]:
                              else a.name), meta.get("version", "?"))
                     except Exception:
                         continue
-        res[f"🟩 {pasta.name} (node)"] = [
+        res[f"{pasta.name} (node)"] = [
             {"name": k, "version": v} for k, v in sorted(vistos.items())]
     return res
 
@@ -1412,9 +1412,10 @@ elif pagina == "🚀 Aplicativos":
             for i, (app_nome, pacotes) in enumerate(libs.items(), start=1):
                 cols_resumo[i].metric(app_nome, len(pacotes))
             st.caption(
-                "Cada app tem seu ambiente ISOLADO (venv Python ou node_modules) — versões "
-                "podem diferir entre apps sem conflito. 🟩 = app Node (conta também as "
-                "dependências indiretas). Clique pra ver/filtrar. Atualiza a cada 5 min."
+                "Cada app tem seu ambiente ISOLADO (venv Python ou node_modules) — "
+                "versões podem diferir entre apps sem conflito. (node) = app "
+                "JavaScript, contando dependências indiretas. Clique pra "
+                "ver/filtrar. Atualiza a cada 5 min."
             )
             for app_nome, pacotes in libs.items():
                 with st.expander(f"📦 **{app_nome}** — {len(pacotes)} bibliotecas"):
