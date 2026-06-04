@@ -1442,6 +1442,7 @@ with st.sidebar:
         "🌿 Git & Deploys",
         "🧠 IA & LLMs",
         "🐘 Supabase VPS",
+        "🔔 Alertas",
         "🔌 Acesso MCP (Claude)",
         "💾 Servidor & Limites",
         "👤 Conta",
@@ -2879,6 +2880,177 @@ elif pagina == "🐘 Supabase VPS":
             st.caption("🔄 atualiza sozinho a cada 6s · cada linha = uma "
                        "execução (manual ou do relógio).")
         _logs_banco()
+
+
+# ============================================================
+# PAGINA: Alertas & Sentinela
+# ============================================================
+
+elif pagina == "🔔 Alertas":
+    st.title("🔔 Alertas & Sentinela")
+    st.markdown(ABAS_CSS, unsafe_allow_html=True)
+    AL_CFG = Path.home() / ".vps_alertas.json"
+    try:
+        _acfg = json.loads(AL_CFG.read_text())
+    except Exception:
+        _acfg = {}
+    _canais = _acfg.setdefault("canais", [])
+
+    def _salvar_acfg():
+        AL_CFG.write_text(json.dumps(_acfg, ensure_ascii=False, indent=1))
+
+    _, _tm_s = _run(["systemctl", "is-active", "vpssentinela.timer"], timeout=5)
+    _sent_on = _tm_s.strip() == "active"
+    st.caption(f"Sentinela {'🟢 de ronda a cada 2 min' if _sent_on else '🔴 timer não instalado (kit no handoff)'} · "
+               "monitora serviços (e REINICIA sozinha), worker travado, disco, "
+               "certificado, backups atrasados e deploys ❌ — avisando por "
+               "TODOS os canais ligados.")
+    if st.button("💬 Enviar TESTE por todos os canais ligados", type="primary"):
+        with st.spinner("Disparando teste..."):
+            _rc_t, _out_t = _run(["python3",
+                                  "/home/ubuntu/vps-admin/sentinela.py",
+                                  "teste"], timeout=90)
+        st.code(_out_t or "(sem saída)", language="text")
+
+    tab_can, tab_reg, tab_dia = st.tabs(["📡 Canais", "⚙️ Regras", "🧾 Diário"])
+
+    with tab_can:
+        c_ca1, c_ca2 = st.columns([4.2, 1.5], vertical_alignment="center")
+        c_ca1.caption("Cada alerta sai por todos os canais 🟢. WhatsApp = fase 2 "
+                      "(Evolution API no nosso VPS).")
+        _f_nc = bool(st.session_state.get("form_novo_canal"))
+        if c_ca2.button("✖ Fechar" if _f_nc else "➕ Novo canal",
+                        type="secondary" if _f_nc else "primary",
+                        use_container_width=True):
+            st.session_state["form_novo_canal"] = not _f_nc
+            st.rerun()
+        if st.session_state.get("form_novo_canal"):
+            with st.container(border=True):
+                _tipo_c = st.selectbox("Tipo", ["📱 ntfy.sh (push no celular)",
+                                                "✈️ Telegram (bot)",
+                                                "📧 E-mail (Gmail/SMTP)"])
+                _novo_c = {"ativo": True,
+                           "id": f"c{int(time.time())}"}
+                if _tipo_c.startswith("📱"):
+                    st.caption("Instale o app **ntfy** no celular → assine um "
+                               "tópico SECRETO (nome difícil de adivinhar) → "
+                               "escreva o mesmo nome aqui.")
+                    _top_c = st.text_input("Tópico ntfy",
+                                           placeholder="ex.: escola-parque-x9k2w")
+                    _novo_c.update({"tipo": "ntfy", "nome": "📱 ntfy",
+                                    "topico": _top_c.strip()})
+                    _valido = bool(_top_c.strip())
+                elif _tipo_c.startswith("✈️"):
+                    st.caption("No Telegram: fale com **@BotFather** → /newbot → "
+                               "copie o token. Depois mande um 'oi' pro seu bot "
+                               "e pegue seu chat_id falando com **@userinfobot**.")
+                    _tok_c = st.text_input("Token do bot", type="password")
+                    _chat_c = st.text_input("Chat ID", placeholder="ex.: 123456789")
+                    _novo_c.update({"tipo": "telegram", "nome": "✈️ Telegram",
+                                    "token": _tok_c.strip(),
+                                    "chat": _chat_c.strip()})
+                    _valido = bool(_tok_c.strip() and _chat_c.strip())
+                else:
+                    st.caption("Gmail: ative verificação em 2 etapas → "
+                               "myaccount.google.com/apppasswords → gere uma "
+                               "'senha de app' (16 letras) e cole aqui.")
+                    _usu_c = st.text_input("Seu Gmail (remetente)",
+                                           placeholder="voce@gmail.com")
+                    _sen_c = st.text_input("Senha de app", type="password")
+                    _para_c = st.text_input("Enviar para (vazio = você mesmo)")
+                    _novo_c.update({"tipo": "email", "nome": "📧 E-mail",
+                                    "usuario": _usu_c.strip(),
+                                    "senha_app": _sen_c.strip().replace(" ", ""),
+                                    "para": _para_c.strip()})
+                    _valido = bool(_usu_c.strip() and _sen_c.strip())
+                if st.button("➕ Adicionar canal", type="primary"):
+                    if not _valido:
+                        st.error("Preencha os campos do canal.")
+                    else:
+                        _canais.append(_novo_c)
+                        _salvar_acfg()
+                        st.session_state["form_novo_canal"] = False
+                        st.rerun()
+        for _c in list(_canais):
+            with st.container(border=True):
+                cc1, cc2, cc3 = st.columns([4.2, 0.9, 0.5],
+                                           vertical_alignment="center")
+                _det_c = {"ntfy": f"tópico `{_c.get('topico', '?')}`",
+                          "telegram": f"chat `{_c.get('chat', '?')}`",
+                          "email": f"`{_c.get('usuario', '?')}` → "
+                                   f"`{_c.get('para') or _c.get('usuario', '?')}`"
+                          }.get(_c.get("tipo"), "")
+                cc1.markdown(f"**{_c.get('nome', _c.get('tipo'))}**  \n"
+                             f"<small>{_det_c}</small>", unsafe_allow_html=True)
+                _at_c = cc2.toggle("ligado", value=bool(_c.get("ativo", True)),
+                                   key=f"cal_{_c.get('id')}")
+                if _at_c != bool(_c.get("ativo", True)):
+                    _c["ativo"] = _at_c
+                    _salvar_acfg()
+                    st.rerun()
+                if cc3.button("✕", key=f"cdel_{_c.get('id')}"):
+                    _canais.remove(_c)
+                    _salvar_acfg()
+                    st.rerun()
+        if not _canais:
+            st.info("Nenhum canal ainda — ➕ Novo canal (o ntfy leva 1 minuto).")
+
+    with tab_reg:
+        _r1, _r2 = st.columns(2)
+        _g_on = _r1.toggle("🟢 Sentinela ativa",
+                           value=bool(_acfg.get("ativo", True)))
+        _g_ar = _r2.toggle("🔧 Auto-restart (cura sozinha)",
+                           value=bool(_acfg.get("auto_restart", True)))
+        _n1, _n2, _n3, _n4 = st.columns(4)
+        _hb = _n1.number_input("Worker mudo (min)", 2, 60,
+                               int(_acfg.get("heartbeat_min", 5)))
+        _dc = _n2.number_input("Disco cheio (%)", 50, 99,
+                               int(_acfg.get("disco_pct", 85)))
+        _ct = _n3.number_input("Cert vence (dias)", 3, 60,
+                               int(_acfg.get("cert_dias", 14)))
+        _bk = _n4.number_input("Backup atrasado (h)", 2, 168,
+                               int(_acfg.get("backup_horas", 26)))
+        _svc_mon = st.multiselect(
+            "Serviços vigiados", list(todos_servicos().keys()),
+            default=[s for s in _acfg.get("servicos",
+                     list(todos_servicos().keys()))
+                     if s in todos_servicos()])
+        if st.button("💾 Salvar regras", type="primary"):
+            _acfg.update({"ativo": _g_on, "auto_restart": _g_ar,
+                          "heartbeat_min": int(_hb), "disco_pct": int(_dc),
+                          "cert_dias": int(_ct), "backup_horas": int(_bk),
+                          "servicos": _svc_mon})
+            _salvar_acfg()
+            st.success("Regras salvas — valem na próxima ronda (≤2 min).")
+        st.caption("Anti-spam: avisa na hora do problema e re-avisa a cada 6h "
+                   "enquanto durar; manda ✅ quando resolve.")
+
+    with tab_dia:
+        try:
+            _evts_a = [json.loads(l) for l in
+                       (Path.home() / ".vps_alertas_log.jsonl"
+                        ).read_text().splitlines() if l.strip()]
+        except Exception:
+            _evts_a = []
+        if not _evts_a:
+            st.info("Nenhum alerta registrado ainda — bom sinal. 😴")
+        else:
+            _linhas_a = []
+            for _e in reversed(_evts_a[-100:]):
+                _q_a = _e.get("quando", "?")
+                try:
+                    _d_a, _h_a = _q_a.split(" ")
+                    _a_a, _m_a, _dd_a = _d_a.split("-")
+                    _q_a = f"{_dd_a}/{_m_a}/{_a_a} {_h_a}"
+                except Exception:
+                    pass
+                _linhas_a.append(f"{_q_a}  "
+                                 + ("📤" if _e.get("enviado") else "📵")
+                                 + f" {_e.get('msg', '')}")
+            with st.container(height=380):
+                st.code("\n".join(_linhas_a), language="text")
+            st.caption("📤 = entregue nos canais · 📵 = gerado mas nenhum canal "
+                       "entregou (conferir credenciais)")
 
 
 # ============================================================

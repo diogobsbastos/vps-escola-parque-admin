@@ -1,0 +1,8 @@
+[Unit]
+Description=VPS Sentinela (monitora, avisa no Telegram e se cura)
+After=network.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+ExecStart=/usr/bin/python3 /home/ubuntu/vps-admin/sentinela.py

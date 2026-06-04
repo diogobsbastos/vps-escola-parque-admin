@@ -1,0 +1,9 @@
+[Unit]
+Description=Sentinela a cada 2 minutos
+
+[Timer]
+OnCalendar=*-*-* *:00/2:30
+Persistent=true
+
+[Install]
+WantedBy=timers.target
