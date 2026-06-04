@@ -578,6 +578,17 @@ GIT_PROJETOS: dict[str, dict] = {
 }
 
 
+ABAS_CSS = (
+    "<style>button[data-baseweb='tab'] p{font-size:1.0rem;font-weight:600;}"
+    "button[data-baseweb='tab']{padding:0.7rem 1.6rem;min-height:2.8rem;"
+    "justify-content:center;text-align:center;"
+    "border-radius:10px 10px 0 0;margin-right:1px;}"
+    "div[data-baseweb='tab-list']{gap:0.15rem;}"
+    "button[data-baseweb='tab']:hover{background:#f3f4f6;}"
+    "button[data-baseweb='tab'][aria-selected='true']{background:#fef2f2;}"
+    "</style>"
+)
+
 GIT_PROJ_PATH = Path.home() / ".vps_git_projetos.json"
 
 
@@ -1104,8 +1115,7 @@ with st.sidebar:
         "🚀 Aplicativos",
         "🌐 Domínios & Rotas",
         "🌿 Git & Deploys",
-        "🦙 Ollama (IA local)",
-        "🔑 API da LLM",
+        "🧠 IA & LLMs",
         "🔌 Acesso MCP (Claude)",
         "💾 Servidor & Limites",
         "👤 Conta",
@@ -1524,17 +1534,7 @@ elif pagina == "🌿 Git & Deploys":
             dialog_webhook()
     with c_t:
         st.title("🌿 Git & Deploys")
-    st.markdown("<style>button[data-baseweb='tab'] p"
-                "{font-size:1.0rem;font-weight:600;}"
-                "button[data-baseweb='tab']"
-                "{padding:0.7rem 1.6rem;min-height:2.8rem;"
-                "justify-content:center;text-align:center;"
-                "border-radius:10px 10px 0 0;margin-right:1px;}"
-                "div[data-baseweb='tab-list']{gap:0.15rem;}"
-                "button[data-baseweb='tab']:hover{background:#f3f4f6;}"
-                "button[data-baseweb='tab'][aria-selected='true']"
-                "{background:#fef2f2;}</style>",
-                unsafe_allow_html=True)
+    st.markdown(ABAS_CSS, unsafe_allow_html=True)
     tab_git, tab_dep = st.tabs(["🐙 GitHub", "🚀 Deploys"])
     with tab_git:
         with c_add:
@@ -1820,300 +1820,296 @@ elif pagina == "🌿 Git & Deploys":
 # PAGINA: Ollama
 # ============================================================
 
-elif pagina == "🦙 Ollama (IA local)":
-    st.title("🦙 Ollama — LLM local")
+elif pagina == "🧠 IA & LLMs":
+    st.title("🧠 IA & LLMs")
+    st.markdown(ABAS_CSS, unsafe_allow_html=True)
+    tab_oll, tab_api = st.tabs(["🦙 Ollama (local)", "🔑 API da LLM"])
+    with tab_oll:
 
-    # ---- Modo 24h na RAM (modelo residente) ----
-    _24h_atual = bool(_cfg.get("ollama_24h"))
-    with st.container(border=True):
-        c_tg, c_tx = st.columns([1.3, 4.2], vertical_alignment="center")
-        lig24 = c_tg.toggle("🔥 **24h na RAM**", value=_24h_atual, key="tg_24h")
-        c_tx.markdown(
-            "**Ligado:** o modelo fica **residente na memória** → resposta imediata, sem o "
-            "\"modelo carregando\" (ocupa ~o tamanho do modelo em RAM — temos folga: 24 GB).  \n"
-            "**Desligado:** o Ollama descarrega após ~5 min ocioso → economiza RAM, mas o "
-            "1º pedido depois da pausa leva 30-60s recarregando do disco. "
-            "*Cada uso pela API renova as 24h.*"
-        )
-    if lig24 != _24h_atual:
-        config_salvar("ollama_24h", lig24)
-        _alvos = [m.get("name", "") for m in ollama_modelos() if m.get("name")]
-        with st.spinner(("Carregando modelo(s) na RAM (até 1 min)..." if lig24
-                         else "Descarregando modelo(s) da RAM...")):
-            _oks = [ollama_manter_na_ram(_m, lig24) for _m in _alvos]
-        if all(_oks):
-            st.success("🔥 Modelo(s) residentes na RAM por 24h — resposta imediata."
-                       if lig24 else "💤 RAM liberada — modelos carregam sob demanda.")
+        # ---- Modo 24h na RAM (modelo residente) ----
+        _24h_atual = bool(_cfg.get("ollama_24h"))
+        with st.container(border=True):
+            c_tg, c_tx = st.columns([1.3, 4.2], vertical_alignment="center")
+            lig24 = c_tg.toggle("🔥 **24h na RAM**", value=_24h_atual, key="tg_24h")
+            c_tx.markdown(
+                "**Ligado:** o modelo fica **residente na memória** → resposta imediata, sem o "
+                "\"modelo carregando\" (ocupa ~o tamanho do modelo em RAM — temos folga: 24 GB).  \n"
+                "**Desligado:** o Ollama descarrega após ~5 min ocioso → economiza RAM, mas o "
+                "1º pedido depois da pausa leva 30-60s recarregando do disco. "
+                "*Cada uso pela API renova as 24h.*"
+            )
+        if lig24 != _24h_atual:
+            config_salvar("ollama_24h", lig24)
+            _alvos = [m.get("name", "") for m in ollama_modelos() if m.get("name")]
+            with st.spinner(("Carregando modelo(s) na RAM (até 1 min)..." if lig24
+                             else "Descarregando modelo(s) da RAM...")):
+                _oks = [ollama_manter_na_ram(_m, lig24) for _m in _alvos]
+            if all(_oks):
+                st.success("🔥 Modelo(s) residentes na RAM por 24h — resposta imediata."
+                           if lig24 else "💤 RAM liberada — modelos carregam sob demanda.")
+            else:
+                st.warning("Config salva, mas algum modelo não respondeu — confira o serviço ollama.")
+            time.sleep(1.2)
+            st.rerun()
+
+        modelos = ollama_modelos()
+        if modelos:
+            st.subheader("Modelos instalados")
+            for m in modelos:
+                nome_m = m.get("name", "")
+                with st.container(border=True):
+                    c1, c2, c3 = st.columns([4.5, 1.3, 1.3])
+                    c1.markdown(f"**`{nome_m}`** · {m.get('size', 0)/1e9:.1f} GB")
+                    specs_on = c2.toggle("📋 Specs", key=f"olsp_{nome_m}")
+                    if c3.button("🗑️ Remover", key=f"olrm_{nome_m}", use_container_width=True):
+                        with st.spinner("Removendo..."):
+                            rc, out = _run(["ollama", "rm", nome_m], timeout=120)
+                        (st.success if rc == 0 else st.error)(out[:300] or "Removido.")
+                        time.sleep(1)
+                        st.rerun()
+
+                    if specs_on:
+                        info = ollama_show(nome_m)
+                        det = info.get("details", {}) or {}
+                        mi = info.get("model_info", {}) or {}
+                        ctx = next((v for k, v in mi.items() if k.endswith("context_length")), "?")
+                        emb = next((v for k, v in mi.items() if k.endswith("embedding_length")), "?")
+
+                        st.markdown("##### 🧬 Especificações do modelo")
+                        e1, e2, e3, e4 = st.columns(4)
+                        e1.metric("Família", str(det.get("family", "?")))
+                        e2.metric("Parâmetros", str(det.get("parameter_size", "?")))
+                        e3.metric("Quantização", str(det.get("quantization_level", "?")))
+                        e4.metric("Contexto máx.", f"{ctx:,}".replace(",", ".") if isinstance(ctx, int) else str(ctx))
+                        st.caption(
+                            f"Formato: `{det.get('format', '?')}` · Embedding: `{emb}` · "
+                            f"⚠️ Limites desta máquina: CPU ARM (sem GPU) ≈ 2-5 tokens/s neste porte; "
+                            f"1 requisição por vez (fila); RAM ocupada ao usar ≈ tamanho do modelo + contexto."
+                        )
+
+                        st.markdown("##### 📡 Endereços de acesso")
+                        st.markdown(
+                            f"""
+    | De onde | Endereço | Uso |
+    |---|---|---|
+    | **Dentro do servidor** (apps deste VPS) | `http://localhost:11434` | É o que o LiteLLM/worker usam |
+    | **API estilo OpenAI** (compatível) | `http://localhost:11434/v1` | base_url p/ LiteLLM/SDKs |
+    | **Rede interna Oracle** (outra VM da VCN) | `http://10.0.0.237:11434` | entre máquinas suas |
+    | **Do seu PC (seguro)** | túnel SSH ⤵️ | recomendado |
+    """
+                        )
+                        st.markdown("**Acessar do seu PC via túnel SSH** (abre e deixa aberto):")
+                        st.code(
+                            'ssh -i "$HOME\\.ssh\\ssh-key-2026-06-03.key" -N -L 11434:localhost:11434 '
+                            f'ubuntu@{IP_PUBLICO}',
+                            language="powershell",
+                        )
+                        st.caption(
+                            "Com o túnel ativo, seu PC enxerga este Ollama em `http://localhost:11434` "
+                            "como se fosse local. 🔒 NÃO abrimos a porta 11434 pra internet de propósito: "
+                            "o Ollama não tem senha — porta pública = qualquer um usando sua máquina."
+                        )
+                        st.markdown("**Teste rápido (dentro do servidor):**")
+                        st.code(
+                            f"curl http://localhost:11434/api/generate -d "
+                            f"'{{\"model\": \"{nome_m}\", \"prompt\": \"Diga OK\", \"stream\": false}}'",
+                            language="bash",
+                        )
         else:
-            st.warning("Config salva, mas algum modelo não respondeu — confira o serviço ollama.")
-        time.sleep(1.2)
-        st.rerun()
+            st.warning("Ollama sem resposta em localhost:11434 (serviço parado?).")
 
-    modelos = ollama_modelos()
-    if modelos:
-        st.subheader("Modelos instalados")
-        for m in modelos:
-            nome_m = m.get("name", "")
-            with st.container(border=True):
-                c1, c2, c3 = st.columns([4.5, 1.3, 1.3])
-                c1.markdown(f"**`{nome_m}`** · {m.get('size', 0)/1e9:.1f} GB")
-                specs_on = c2.toggle("📋 Specs", key=f"olsp_{nome_m}")
-                if c3.button("🗑️ Remover", key=f"olrm_{nome_m}", use_container_width=True):
-                    with st.spinner("Removendo..."):
-                        rc, out = _run(["ollama", "rm", nome_m], timeout=120)
-                    (st.success if rc == 0 else st.error)(out[:300] or "Removido.")
+        st.divider()
+        c_tit, c_atu = st.columns([4, 1.6], vertical_alignment="center")
+        with c_tit:
+            st.subheader("⬇️ Baixar modelo novo")
+        with c_atu:
+            if st.button("🔄 Atualizar Lista", use_container_width=True):
+                with st.spinner("Buscando lista de modelos (ollama.com)..."):
+                    ok, qtd = atualizar_catalogo_ollama()
+                if ok:
+                    st.success(f"Catálogo atualizado: {qtd} modelos.")
                     time.sleep(1)
                     st.rerun()
+                else:
+                    st.error("Falha ao buscar o catálogo (rede?). Usando lista local.")
 
-                if specs_on:
-                    info = ollama_show(nome_m)
-                    det = info.get("details", {}) or {}
-                    mi = info.get("model_info", {}) or {}
-                    ctx = next((v for k, v in mi.items() if k.endswith("context_length")), "?")
-                    emb = next((v for k, v in mi.items() if k.endswith("embedding_length")), "?")
-
-                    st.markdown("##### 🧬 Especificações do modelo")
-                    e1, e2, e3, e4 = st.columns(4)
-                    e1.metric("Família", str(det.get("family", "?")))
-                    e2.metric("Parâmetros", str(det.get("parameter_size", "?")))
-                    e3.metric("Quantização", str(det.get("quantization_level", "?")))
-                    e4.metric("Contexto máx.", f"{ctx:,}".replace(",", ".") if isinstance(ctx, int) else str(ctx))
-                    st.caption(
-                        f"Formato: `{det.get('format', '?')}` · Embedding: `{emb}` · "
-                        f"⚠️ Limites desta máquina: CPU ARM (sem GPU) ≈ 2-5 tokens/s neste porte; "
-                        f"1 requisição por vez (fila); RAM ocupada ao usar ≈ tamanho do modelo + contexto."
-                    )
-
-                    st.markdown("##### 📡 Endereços de acesso")
-                    st.markdown(
-                        f"""
-| De onde | Endereço | Uso |
-|---|---|---|
-| **Dentro do servidor** (apps deste VPS) | `http://localhost:11434` | É o que o LiteLLM/worker usam |
-| **API estilo OpenAI** (compatível) | `http://localhost:11434/v1` | base_url p/ LiteLLM/SDKs |
-| **Rede interna Oracle** (outra VM da VCN) | `http://10.0.0.237:11434` | entre máquinas suas |
-| **Do seu PC (seguro)** | túnel SSH ⤵️ | recomendado |
-"""
-                    )
-                    st.markdown("**Acessar do seu PC via túnel SSH** (abre e deixa aberto):")
-                    st.code(
-                        'ssh -i "$HOME\\.ssh\\ssh-key-2026-06-03.key" -N -L 11434:localhost:11434 '
-                        f'ubuntu@{IP_PUBLICO}',
-                        language="powershell",
-                    )
-                    st.caption(
-                        "Com o túnel ativo, seu PC enxerga este Ollama em `http://localhost:11434` "
-                        "como se fosse local. 🔒 NÃO abrimos a porta 11434 pra internet de propósito: "
-                        "o Ollama não tem senha — porta pública = qualquer um usando sua máquina."
-                    )
-                    st.markdown("**Teste rápido (dentro do servidor):**")
-                    st.code(
-                        f"curl http://localhost:11434/api/generate -d "
-                        f"'{{\"model\": \"{nome_m}\", \"prompt\": \"Diga OK\", \"stream\": false}}'",
-                        language="bash",
-                    )
-    else:
-        st.warning("Ollama sem resposta em localhost:11434 (serviço parado?).")
-
-    st.divider()
-    c_tit, c_atu = st.columns([4, 1.6], vertical_alignment="center")
-    with c_tit:
-        st.subheader("⬇️ Baixar modelo novo")
-    with c_atu:
-        if st.button("🔄 Atualizar Lista", use_container_width=True):
-            with st.spinner("Buscando lista de modelos (ollama.com)..."):
-                ok, qtd = atualizar_catalogo_ollama()
-            if ok:
-                st.success(f"Catálogo atualizado: {qtd} modelos.")
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.error("Falha ao buscar o catálogo (rede?). Usando lista local.")
-
-    catalogo = catalogo_ollama()
-    st.caption(
-        f"{len(catalogo)} modelos no catálogo · digite abaixo pra FILTRAR · "
-        "populares têm tamanho real; demais mostram '—' (o tamanho exato confirma no download, "
-        "e os instalados acima já exibem o tamanho real) · dica desta máquina (CPU ARM): até ~10 GB"
-    )
-
-    opcoes = [
-        f"{it['nome']}   —   {it['tamanho']}"
-        if it.get("tamanho") and it["tamanho"] not in ("—", "?")
-        else it["nome"]
-        for it in catalogo
-    ]
-    escolha = st.selectbox(
-        "🔎 Buscar modelo (nome + tamanho juntos — digite pra filtrar)",
-        opcoes,
-    )
-    modelo_final = escolha.split()[0] if escolha else ""
-
-    # Consulta o tamanho REAL no registro oficial ao selecionar (com cache de sessao)
-    if modelo_final:
-        if st.session_state.get("_tam_nome") != modelo_final:
-            with st.spinner("Consultando tamanho no registro oficial..."):
-                st.session_state["_tam_nome"] = modelo_final
-                st.session_state["_tam_val"] = ollama_tamanho_remoto(modelo_final)
-        tam_real = st.session_state.get("_tam_val", "?")
-        if tam_real != "?":
-            gb = float(tam_real.split()[0])
-            params_b = gb / 0.6  # Q4: ~0,6 GB por bilhao de parametros
-            cor_tam = "🟢" if gb <= 10 else "⚠️"
-            st.markdown(
-                f"📦 **Tamanho do download:** {tam_real} {cor_tam} &nbsp;·&nbsp; "
-                f"🧠 **≈ {params_b:.0f}B parâmetros** *(estimado p/ quantização Q4)*"
-            )
-            if gb > 10:
-                st.caption("⚠️ Acima de ~10 GB fica pesado nesta máquina (CPU ARM, 24 GB RAM compartilhada com os apps).")
-        else:
-            st.caption("📦 Tamanho não disponível no registro pra esta variante.")
-
-    if modelo_final and st.button(f"⬇️ Baixar {modelo_final}", type="primary"):
-        with st.spinner(f"Baixando {modelo_final} — modelos grandes levam minutos..."):
-            rc, out = _run(["ollama", "pull", modelo_final], timeout=3600)
-        (st.success if rc == 0 else st.error)((out or "Concluído.")[-500:])
-        if rc == 0:
-            time.sleep(1)
-            st.rerun()
-
-
-# ============================================================
-# PAGINA: API da LLM (console de chaves, estilo Gemini)
-# ============================================================
-
-elif pagina == "🔑 API da LLM":
-    on = gateway_online()
-    c_tit, c_status, c_ex = st.columns([3.2, 1.6, 1.2], vertical_alignment="center")
-    with c_tit:
-        st.title("🔑 API da LLM")
-    with c_status:
-        st.markdown("🟢 **Gateway Online**" if on else "🔴 **Gateway Offline**")
-    with c_ex:
-        with st.popover("📋 Exemplos", use_container_width=True):
-            st.caption("Endpoint OpenAI-compatible. Modelo = um dos instalados (aba Ollama).")
-            st.code(
-                f'''# Python (openai sdk)
-from openai import OpenAI
-client = OpenAI(base_url="{URL_BASE}/llm/v1", api_key="SUA_CHAVE")
-r = client.chat.completions.create(
-    model="qwen2.5:14b",
-    messages=[{{"role": "user", "content": "Olá!"}}],
-)
-print(r.choices[0].message.content)''',
-                language="python",
-            )
-            st.code(
-                f'''curl {URL_BASE}/llm/v1/chat/completions \\
-  -H "Authorization: Bearer SUA_CHAVE" \\
-  -H "Content-Type: application/json" \\
-  -d '{{"model":"qwen2.5:14b","messages":[{{"role":"user","content":"Oi"}}]}}' ''',
-                language="bash",
-            )
-
-    st.code(f"{URL_BASE}/llm/v1", language="text")
-    _mods = ", ".join(f"`{m.get('name','')}`" for m in ollama_modelos()) or "*nenhum modelo instalado*"
-    st.caption(
-        f"📡 Endereço da API — entregue base_url acima + uma chave ao cliente/projeto.  \n"
-        f"🦙 **LLMs disponíveis neste servidor (Ollama):** {_mods} — cada chave é amarrada a uma delas."
-    )
-    if not on:
-        st.warning(
-            "O Gateway não respondeu — chaves não funcionarão. "
-            "Rode: `sudo systemctl restart llmgateway` (setup: `llm_gateway/SETUP.md`)."
+        catalogo = catalogo_ollama()
+        st.caption(
+            f"{len(catalogo)} modelos no catálogo · digite abaixo pra FILTRAR · "
+            "populares têm tamanho real; demais mostram '—' (o tamanho exato confirma no download, "
+            "e os instalados acima já exibem o tamanho real) · dica desta máquina (CPU ARM): até ~10 GB"
         )
 
-    st.divider()
-    c_t, c_b = st.columns([5, 1.5], vertical_alignment="center")
-    with c_t:
-        st.subheader("🗝️ Chaves cadastradas")
-    with c_b:
-        if st.button("➕ Criar chave", type="primary", use_container_width=True):
-            st.session_state["form_key_aberto"] = not st.session_state.get("form_key_aberto", False)
+        opcoes = [
+            f"{it['nome']}   —   {it['tamanho']}"
+            if it.get("tamanho") and it["tamanho"] not in ("—", "?")
+            else it["nome"]
+            for it in catalogo
+        ]
+        escolha = st.selectbox(
+            "🔎 Buscar modelo (nome + tamanho juntos — digite pra filtrar)",
+            opcoes,
+        )
+        modelo_final = escolha.split()[0] if escolha else ""
 
-    if st.session_state.get("form_key_aberto"):
-        with st.container(border=True):
-            instalados = [m.get("name", "") for m in ollama_modelos() if m.get("name")]
-            with st.form("nova_key", clear_on_submit=True, border=False):
-                c1, c2, c3 = st.columns([2.6, 1.8, 1], vertical_alignment="bottom")
-                nome_key = c1.text_input("Nome / cliente (ex.: 'Sertanejo Lab', 'Cliente João')")
-                modelo_key = c2.selectbox(
-                    "🦙 LLM ativa da chave",
-                    instalados or ["(nenhum modelo instalado)"],
-                    help="A chave fica AMARRADA a este modelo: o gateway força ele em toda "
-                         "requisição, mesmo que o cliente peça outro.",
+        # Consulta o tamanho REAL no registro oficial ao selecionar (com cache de sessao)
+        if modelo_final:
+            if st.session_state.get("_tam_nome") != modelo_final:
+                with st.spinner("Consultando tamanho no registro oficial..."):
+                    st.session_state["_tam_nome"] = modelo_final
+                    st.session_state["_tam_val"] = ollama_tamanho_remoto(modelo_final)
+            tam_real = st.session_state.get("_tam_val", "?")
+            if tam_real != "?":
+                gb = float(tam_real.split()[0])
+                params_b = gb / 0.6  # Q4: ~0,6 GB por bilhao de parametros
+                cor_tam = "🟢" if gb <= 10 else "⚠️"
+                st.markdown(
+                    f"📦 **Tamanho do download:** {tam_real} {cor_tam} &nbsp;·&nbsp; "
+                    f"🧠 **≈ {params_b:.0f}B parâmetros** *(estimado p/ quantização Q4)*"
                 )
-                criar = c3.form_submit_button("Gerar 🔑", type="primary", use_container_width=True)
-            if criar and not instalados:
-                st.error("Nenhum modelo instalado no Ollama — baixe um na aba 🦙 Ollama primeiro.")
-            elif criar and nome_key.strip():
-                keys = carregar_api_keys()
-                nova = {
-                    "id": f"key_{int(time.time())}",
-                    "nome": nome_key.strip(),
-                    "key": gerar_api_key(),
-                    "modelo": modelo_key,
-                    "criada_em": time.strftime("%Y-%m-%d %H:%M"),
-                    "ativa": True,
-                }
-                keys.append(nova)
-                if salvar_api_keys(keys):
-                    st.session_state["chave_recem_criada"] = nova["key"]
-                    st.session_state["form_key_aberto"] = False
-                    st.rerun()
-                else:
-                    st.error("Falha ao salvar a chave.")
-            elif criar:
-                st.error("Dê um nome pra chave.")
-
-    if st.session_state.get("chave_recem_criada"):
-        st.success("Chave criada! **Copie AGORA** — ela também fica no 👁️ Ver, mas guarde em local seguro.")
-        st.code(st.session_state["chave_recem_criada"], language="text")
-        if st.button("✅ Copiei, pode esconder"):
-            st.session_state.pop("chave_recem_criada", None)
-            st.rerun()
-    keys = carregar_api_keys()
-    uso = carregar_uso_api()
-    if not keys:
-        st.caption("Nenhuma chave ainda. Crie a primeira acima.")
-    for k in keys:
-        kid = k["id"]
-        u = uso.get(kid, {})
-        ativa = k.get("ativa", True)
-        with st.container(border=True):
-            c1, c2, cp, c3, c4 = st.columns([3.5, 1.2, 0.5, 1.1, 1.1])
-            estado = "🟢 Ativa" if ativa else "🔴 Revogada"
-            c1.markdown(
-                f"**{k.get('nome','—')}** · {estado} · 🦙 `{k.get('modelo', 'qualquer')}`  \n"
-                f"`{k['key'][:14]}…{k['key'][-4:]}` · criada {k.get('criada_em','?')}"
-            )
-            c2.metric("Usos", u.get("usos", 0))
-            if cp.button("⚡", key=f"ping_{kid}", use_container_width=True,
-                         help="Ping — testa a chave de ponta a ponta (gateway → LLM)"):
-                with st.spinner("Pingando a LLM (1º uso pode demorar — modelo carregando)..."):
-                    ok_p, msg_p = ping_api_key(k["key"], k.get("modelo"))
-                if ok_p:
-                    st.success(f"⚡ Chave OK — `{k.get('modelo','?')}` respondeu: “{msg_p}”")
-                else:
-                    st.error(f"⚡ Falhou: {msg_p}")
-            with c3.popover("👁️ Ver", use_container_width=True):
-                st.markdown(f"**{k.get('nome','—')}** · 🦙 LLM: `{k.get('modelo', 'qualquer')}`")
-                st.code(k["key"], language="text")
-                st.caption(f"Último uso: {u.get('ultimo_uso', '—')} · criada {k.get('criada_em','?')}")
-            if ativa:
-                if c4.button("Revogar", key=f"rev_{kid}", use_container_width=True):
-                    k["ativa"] = False
-                    salvar_api_keys(keys)
-                    st.rerun()
+                if gb > 10:
+                    st.caption("⚠️ Acima de ~10 GB fica pesado nesta máquina (CPU ARM, 24 GB RAM compartilhada com os apps).")
             else:
-                if c4.button("Reativar", key=f"rea_{kid}", use_container_width=True):
-                    k["ativa"] = True
-                    salvar_api_keys(keys)
-                    st.rerun()
-            if not ativa:
-                if st.button("🗑️ Excluir definitivamente", key=f"del_{kid}"):
-                    salvar_api_keys([x for x in keys if x["id"] != kid])
-                    st.rerun()
+                st.caption("📦 Tamanho não disponível no registro pra esta variante.")
+
+        if modelo_final and st.button(f"⬇️ Baixar {modelo_final}", type="primary"):
+            with st.spinner(f"Baixando {modelo_final} — modelos grandes levam minutos..."):
+                rc, out = _run(["ollama", "pull", modelo_final], timeout=3600)
+            (st.success if rc == 0 else st.error)((out or "Concluído.")[-500:])
+            if rc == 0:
+                time.sleep(1)
+                st.rerun()
+
+    with tab_api:
+        on = gateway_online()
+        c_status, c_ex = st.columns([4.8, 1.2], vertical_alignment="center")
+        with c_status:
+            st.markdown("🟢 **Gateway Online**" if on else "🔴 **Gateway Offline**")
+        with c_ex:
+            with st.popover("📋 Exemplos", use_container_width=True):
+                st.caption("Endpoint OpenAI-compatible. Modelo = um dos instalados (aba Ollama).")
+                st.code(
+                    f'''# Python (openai sdk)
+    from openai import OpenAI
+    client = OpenAI(base_url="{URL_BASE}/llm/v1", api_key="SUA_CHAVE")
+    r = client.chat.completions.create(
+        model="qwen2.5:14b",
+        messages=[{{"role": "user", "content": "Olá!"}}],
+    )
+    print(r.choices[0].message.content)''',
+                    language="python",
+                )
+                st.code(
+                    f'''curl {URL_BASE}/llm/v1/chat/completions \\
+      -H "Authorization: Bearer SUA_CHAVE" \\
+      -H "Content-Type: application/json" \\
+      -d '{{"model":"qwen2.5:14b","messages":[{{"role":"user","content":"Oi"}}]}}' ''',
+                    language="bash",
+                )
+
+        st.code(f"{URL_BASE}/llm/v1", language="text")
+        _mods = ", ".join(f"`{m.get('name','')}`" for m in ollama_modelos()) or "*nenhum modelo instalado*"
+        st.caption(
+            f"📡 Endereço da API — entregue base_url acima + uma chave ao cliente/projeto.  \n"
+            f"🦙 **LLMs disponíveis neste servidor (Ollama):** {_mods} — cada chave é amarrada a uma delas."
+        )
+        if not on:
+            st.warning(
+                "O Gateway não respondeu — chaves não funcionarão. "
+                "Rode: `sudo systemctl restart llmgateway` (setup: `llm_gateway/SETUP.md`)."
+            )
+
+        st.divider()
+        c_t, c_b = st.columns([5, 1.5], vertical_alignment="center")
+        with c_t:
+            st.subheader("🗝️ Chaves cadastradas")
+        with c_b:
+            if st.button("➕ Criar chave", type="primary", use_container_width=True):
+                st.session_state["form_key_aberto"] = not st.session_state.get("form_key_aberto", False)
+
+        if st.session_state.get("form_key_aberto"):
+            with st.container(border=True):
+                instalados = [m.get("name", "") for m in ollama_modelos() if m.get("name")]
+                with st.form("nova_key", clear_on_submit=True, border=False):
+                    c1, c2, c3 = st.columns([2.6, 1.8, 1], vertical_alignment="bottom")
+                    nome_key = c1.text_input("Nome / cliente (ex.: 'Sertanejo Lab', 'Cliente João')")
+                    modelo_key = c2.selectbox(
+                        "🦙 LLM ativa da chave",
+                        instalados or ["(nenhum modelo instalado)"],
+                        help="A chave fica AMARRADA a este modelo: o gateway força ele em toda "
+                             "requisição, mesmo que o cliente peça outro.",
+                    )
+                    criar = c3.form_submit_button("Gerar 🔑", type="primary", use_container_width=True)
+                if criar and not instalados:
+                    st.error("Nenhum modelo instalado no Ollama — baixe um na aba 🦙 Ollama primeiro.")
+                elif criar and nome_key.strip():
+                    keys = carregar_api_keys()
+                    nova = {
+                        "id": f"key_{int(time.time())}",
+                        "nome": nome_key.strip(),
+                        "key": gerar_api_key(),
+                        "modelo": modelo_key,
+                        "criada_em": time.strftime("%Y-%m-%d %H:%M"),
+                        "ativa": True,
+                    }
+                    keys.append(nova)
+                    if salvar_api_keys(keys):
+                        st.session_state["chave_recem_criada"] = nova["key"]
+                        st.session_state["form_key_aberto"] = False
+                        st.rerun()
+                    else:
+                        st.error("Falha ao salvar a chave.")
+                elif criar:
+                    st.error("Dê um nome pra chave.")
+
+        if st.session_state.get("chave_recem_criada"):
+            st.success("Chave criada! **Copie AGORA** — ela também fica no 👁️ Ver, mas guarde em local seguro.")
+            st.code(st.session_state["chave_recem_criada"], language="text")
+            if st.button("✅ Copiei, pode esconder"):
+                st.session_state.pop("chave_recem_criada", None)
+                st.rerun()
+        keys = carregar_api_keys()
+        uso = carregar_uso_api()
+        if not keys:
+            st.caption("Nenhuma chave ainda. Crie a primeira acima.")
+        for k in keys:
+            kid = k["id"]
+            u = uso.get(kid, {})
+            ativa = k.get("ativa", True)
+            with st.container(border=True):
+                c1, c2, cp, c3, c4 = st.columns([3.5, 1.2, 0.5, 1.1, 1.1])
+                estado = "🟢 Ativa" if ativa else "🔴 Revogada"
+                c1.markdown(
+                    f"**{k.get('nome','—')}** · {estado} · 🦙 `{k.get('modelo', 'qualquer')}`  \n"
+                    f"`{k['key'][:14]}…{k['key'][-4:]}` · criada {k.get('criada_em','?')}"
+                )
+                c2.metric("Usos", u.get("usos", 0))
+                if cp.button("⚡", key=f"ping_{kid}", use_container_width=True,
+                             help="Ping — testa a chave de ponta a ponta (gateway → LLM)"):
+                    with st.spinner("Pingando a LLM (1º uso pode demorar — modelo carregando)..."):
+                        ok_p, msg_p = ping_api_key(k["key"], k.get("modelo"))
+                    if ok_p:
+                        st.success(f"⚡ Chave OK — `{k.get('modelo','?')}` respondeu: “{msg_p}”")
+                    else:
+                        st.error(f"⚡ Falhou: {msg_p}")
+                with c3.popover("👁️ Ver", use_container_width=True):
+                    st.markdown(f"**{k.get('nome','—')}** · 🦙 LLM: `{k.get('modelo', 'qualquer')}`")
+                    st.code(k["key"], language="text")
+                    st.caption(f"Último uso: {u.get('ultimo_uso', '—')} · criada {k.get('criada_em','?')}")
+                if ativa:
+                    if c4.button("Revogar", key=f"rev_{kid}", use_container_width=True):
+                        k["ativa"] = False
+                        salvar_api_keys(keys)
+                        st.rerun()
+                else:
+                    if c4.button("Reativar", key=f"rea_{kid}", use_container_width=True):
+                        k["ativa"] = True
+                        salvar_api_keys(keys)
+                        st.rerun()
+                if not ativa:
+                    if st.button("🗑️ Excluir definitivamente", key=f"del_{kid}"):
+                        salvar_api_keys([x for x in keys if x["id"] != kid])
+                        st.rerun()
 
 
 # ============================================================
