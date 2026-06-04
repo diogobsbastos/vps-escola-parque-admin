@@ -1042,7 +1042,8 @@ def dialog_exportar() -> None:
             c0, c1, c2, c3, c4 = st.columns([1.2, 1.9, 0.5, 1.9, 0.5],
                                             vertical_alignment="center")
             if i == 0:
-                c0.markdown(f"<small>`{data_br}`</small>",
+                c0.markdown(f"<span style='font-size:0.95em;font-weight:700;"
+                            f"color:#111827'>{data_br}</span>",
                             unsafe_allow_html=True)
             if i < len(dumps):
                 _a = dumps[i]
@@ -1064,6 +1065,8 @@ def dialog_exportar() -> None:
                                    mime="application/gzip",
                                    key=f"dl_{_c.name}",
                                    help=f"Baixar {_c.name}")
+        st.markdown("<hr style='margin:0.1rem 0;border:none;"
+                    "border-top:1px solid #e5e7eb'>", unsafe_allow_html=True)
 
 
 @st.dialog("✏️ Editar perfil de backup", width="large")
