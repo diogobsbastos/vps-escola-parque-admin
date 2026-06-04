@@ -2721,9 +2721,7 @@ elif pagina == "🐘 Supabase VPS":
                              _logf.read_text().splitlines() if l.strip()]
                 except Exception:
                     pass
-                if not _evts:
-                    st.info("Nenhuma execução registrada ainda — rode um "
-                            "▶ Agora ou espere a ronda do timer (xx:30).")
+                _linhas_l = []
                 for _e in reversed(_evts[-int(_n_lg):]):
                     _res_e = _e.get("resultado", "")
                     _icone = ("✅" if _res_e.startswith("✅") else
@@ -2735,10 +2733,15 @@ elif pagina == "🐘 Supabase VPS":
                         _q_e = f"{_dd_e}/{_m_e}/{_a_e} {_h_e}"
                     except Exception:
                         pass
-                    with st.expander(
-                            f"{_icone} {_q_e} · {_e.get('job', '?')} "
-                            f"({_e.get('modo', '?')}) — {_res_e[:80]}"):
-                        st.code(_res_e or "(sem detalhes)", language="text")
+                    _det = _res_e.lstrip("✅❌💤 ").strip()
+                    _linhas_l.append(f"{_q_e}  {_icone} "
+                                     f"{_e.get('job', '—')} "
+                                     f"({_e.get('modo', '?')}) · {_det}")
+                with st.container(height=420):
+                    st.code("\n".join(_linhas_l)
+                            or "nenhuma execução registrada ainda — rode um "
+                               "▶ Agora ou espere a ronda (xx:30)",
+                            language="text")
             else:
                 with st.container(height=420):
                     st.code((_txt_lg or "sem registros ainda")[-12000:],
