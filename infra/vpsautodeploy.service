@@ -1,0 +1,7 @@
+[Unit]
+Description=VPS Auto-Deploy (confere GitHub e aplica)
+
+[Service]
+Type=oneshot
+User=ubuntu
+ExecStart=/usr/bin/python3 /home/ubuntu/vps-admin/autodeploy.py

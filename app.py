@@ -66,6 +66,7 @@ SERVICOS_BASE: dict[str, str] = {
     "ollama":              "🦙 Ollama (LLM local)",
     "llmgateway":          "🔑 LLM Gateway (API com chave)",
     "vpsmcp":              "🔌 VPS-MCP (ponte do Claude)",
+    "sertanejolab":        "🎸 Sertanejo Lab (app)",
 }
 
 ACOES = ("restart", "stop", "start")
