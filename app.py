@@ -564,8 +564,11 @@ def git_situ_curta(repo: str, conf: dict) -> str:
 
 
 def autodeploy_proximo() -> int | None:
-    """Segundos ate a proxima ronda do vigia (None = timer nao instalado).
-    Timer usa relogio MONOTONICO (OnUnitActiveSec) -> ler via list-timers."""
+    """Segundos ate a proxima ronda do vigia. -1 = vigia TRABALHANDO agora.
+    None = timer nao instalado. (Timer monotonico -> ler via list-timers.)"""
+    _, ativo = _run(["systemctl", "is-active", "vpsautodeploy.service"], timeout=5)
+    if (ativo or "").strip() == "active":
+        return -1
     rc, out = _run(["systemctl", "list-timers", "vpsautodeploy.timer",
                     "--no-pager", "--no-legend"], timeout=5)
     out = (out or "").strip()
@@ -1226,6 +1229,11 @@ elif pagina == "🌿 Git & Deploys":
         seg = autodeploy_proximo()
         if seg is None:
             st.caption("🕐 Vigia auto-deploy: timer não instalado no servidor.")
+            return
+        if seg == -1:
+            st.markdown("### 🔨 Vigia TRABALHANDO agora")
+            st.progress(1.0, text="deploy em andamento (pull/build/restart) — "
+                                  "a contagem volta quando ele terminar")
             return
         m, s2 = divmod(int(seg), 60)
         c_cr1, c_cr2 = st.columns([1.6, 4], vertical_alignment="center")
