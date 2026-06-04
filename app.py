@@ -813,9 +813,11 @@ if pagina == "📊 Dashboard":
     if rotas:
         st.subheader("🌐 Acessos rapidos")
         links = " · ".join(
-            f"[{r}]({URL_BASE}{r})" for r in rotas if r not in ("=",)
+            f"[{r}]({URL_BASE}{r})" for r in rotas
+            if not r.startswith("=") and not r.startswith("/mcp-")
         )
         st.markdown(links)
+        st.caption("🔒 A rota do MCP não aparece aqui de propósito — é segredo (veja em Acesso MCP).")
 
 
 # ============================================================
