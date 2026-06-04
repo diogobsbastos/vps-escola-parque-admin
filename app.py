@@ -1569,7 +1569,9 @@ elif pagina == "🚀 Aplicativos":
             _git_situ[_r] = git_situ_curta(_r, _c)
             for _s in _c.get("servicos", []):
                 _git_svc[_s] = _r
-        for nome, rotulo in todos_servicos().items():
+        _svcs_ord = sorted(todos_servicos().items(),
+                           key=lambda kv: (kv[0] not in ROTAS_APPS, kv[1]))
+        for nome, rotulo in _svcs_ord:
             stt = status_servico(nome)
             cor = {"active": "🟢", "inactive": "⚪", "failed": "🔴"}.get(stt, "🟡")
             with st.container(border=True):
