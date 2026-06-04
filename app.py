@@ -1523,9 +1523,12 @@ elif pagina == "🌿 Git & Deploys":
         st.title("🌿 Git & Deploys")
     st.markdown("<style>button[data-baseweb='tab'] p"
                 "{font-size:1.0rem;font-weight:600;}"
-                "button[data-baseweb='tab']{padding:0 14px;}"
+                "button[data-baseweb='tab']"
+                "{padding:0.4rem 1rem;justify-content:center;text-align:center;"
+                "border-radius:8px 8px 0 0;margin-right:2px;}"
+                "button[data-baseweb='tab']:hover{background:#f3f4f6;}"
                 "button[data-baseweb='tab'][aria-selected='true']"
-                "{background:#fef2f2;border-radius:8px 8px 0 0;}</style>",
+                "{background:#fef2f2;}</style>",
                 unsafe_allow_html=True)
     tab_git, tab_dep = st.tabs(["🐙 GitHub", "🚀 Deploys"])
     with tab_git:
