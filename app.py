@@ -1733,13 +1733,18 @@ elif pagina == "🌿 Git & Deploys":
                         st.rerun()
     hist = git_hist_ler()
     if hist:
-        with st.expander(f"📜 Histórico de deploys ({len(hist)})"):
-            for ev in reversed(hist[-30:]):
-                st.markdown(
-                    f"<small>`{ev.get('quando', '?')}` · **{ev.get('repo', '?')}** · "
-                    f"`{ev.get('commit', '?')}` · {ev.get('origem', '?')}</small>",
-                    unsafe_allow_html=True,
-                )
+        with st.expander(f"📜 Histórico de deploys ({len(hist)} — guarda os 100 últimos)"):
+            _repos_h = sorted({e.get("repo", "?") for e in hist})
+            _f_h = st.selectbox("Filtrar por projeto", ["📁 todos os projetos"] + _repos_h,
+                                key="hist_filtro", label_visibility="collapsed")
+            _dados_h = [
+                {"quando": e.get("quando", "?"), "projeto": e.get("repo", "?"),
+                 "commit": e.get("commit", "?"), "origem": e.get("origem", "?")}
+                for e in reversed(hist)
+                if _f_h == "📁 todos os projetos" or e.get("repo") == _f_h
+            ]
+            st.dataframe(_dados_h, use_container_width=True, height=230,
+                         hide_index=True)
     st.divider()
     st.caption(
         "⚡ Fluxo da casa: commit → GitHub toca a campainha (webhook) → vigia aplica "
