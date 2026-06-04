@@ -1025,17 +1025,19 @@ def dialog_exportar() -> None:
     pag = (c_pag.number_input("Página", 1, total_pag, 1,
                               label_visibility="collapsed")
            if total_pag > 1 else 1)
-    st.markdown("<style>"
-                "div[data-testid='stDownloadButton'] button"
-                "{width:2.2rem;min-width:2.2rem;height:1.9rem;"
-                "min-height:1.9rem;padding:0;}"
-                "div[data-testid='stDialog'] [data-testid='stMarkdownContainer'] p"
-                "{margin:0;padding:0;line-height:1.2;}"
-                "div[data-testid='stDialog'] [data-testid='stVerticalBlock']"
-                "{gap:0.2rem;}"
-                "div[data-testid='stDialog'] [data-testid='stHorizontalBlock']"
-                "{align-items:center;}"
-                "</style>", unsafe_allow_html=True)
+    import base64 as _b64
+
+    def _link_dl(a: Path) -> str:
+        b64 = _b64.b64encode(a.read_bytes()).decode()
+        return (f"<a download='{a.name}' "
+                f"href='data:application/gzip;base64,{b64}' "
+                f"style='text-decoration:none;background:#f3f4f6;"
+                f"border:1px solid #d1d5db;border-radius:6px;"
+                f"padding:2px 10px;color:#111827'>⬇</a>")
+
+    _td = "padding:6px 8px;border-bottom:1px solid #e5e7eb;"
+    _sep = "border-left:1px solid #d1d5db;"
+    linhas_html = []
     for k in chaves[(int(pag) - 1) * POR_PAG: int(pag) * POR_PAG]:
         itens = grupos[k]
         dumps = [a for a in itens if a.name.endswith(".sql.gz")]
@@ -1044,36 +1046,38 @@ def dialog_exportar() -> None:
             data_br = f"{k[8:10]}/{k[5:7]}/{k[0:4]} {k[11:13]}:{k[13:15]}"
         except Exception:
             data_br = k
-        linhas_g = max(len(dumps), 1)
-        for i in range(linhas_g):
-            c0, c1, c2, c3, c4 = st.columns([1.2, 1.9, 0.5, 1.9, 0.5],
-                                            vertical_alignment="center")
-            if i == 0:
-                c0.markdown(f"<span style='font-size:0.95em;font-weight:700;"
-                            f"color:#111827'>{data_br}</span>",
-                            unsafe_allow_html=True)
+        for i in range(max(len(dumps), 1)):
+            cel_data = (f"<b>{data_br}</b>" if i == 0 else "")
+            cel_d = lk_d = cel_c = lk_c = ""
             if i < len(dumps):
                 _a = dumps[i]
-                c1.markdown(f"<small>🗄️ **{_a.name.rsplit('_', 2)[0]}** · "
-                            f"{max(1, _a.stat().st_size // 1024)} KB</small>",
-                            unsafe_allow_html=True)
-                c2.download_button("⬇", data=_a.read_bytes(),
-                                   file_name=_a.name,
-                                   mime="application/gzip",
-                                   key=f"dl_{_a.name}",
-                                   help=f"Baixar {_a.name}")
+                cel_d = (f"🗄️ <b>{_a.name.rsplit('_', 2)[0]}</b> · "
+                         f"{max(1, _a.stat().st_size // 1024)} KB")
+                lk_d = _link_dl(_a)
             if i == 0 and confs:
                 _c = confs[0]
-                c3.markdown(f"<small>🔐 segredos & configs · "
-                            f"{max(1, _c.stat().st_size // 1024)} KB</small>",
-                            unsafe_allow_html=True)
-                c4.download_button("⬇", data=_c.read_bytes(),
-                                   file_name=_c.name,
-                                   mime="application/gzip",
-                                   key=f"dl_{_c.name}",
-                                   help=f"Baixar {_c.name}")
-        st.markdown("<hr style='margin:0.1rem 0;border:none;"
-                    "border-top:1px solid #e5e7eb'>", unsafe_allow_html=True)
+                cel_c = (f"🔐 segredos & configs · "
+                         f"{max(1, _c.stat().st_size // 1024)} KB")
+                lk_c = _link_dl(_c)
+            linhas_html.append(
+                f"<tr>"
+                f"<td style='{_td}white-space:nowrap'>{cel_data}</td>"
+                f"<td style='{_td}{_sep}padding-left:12px'>{cel_d}</td>"
+                f"<td style='{_td}text-align:center'>{lk_d}</td>"
+                f"<td style='{_td}{_sep}padding-left:12px'>{cel_c}</td>"
+                f"<td style='{_td}text-align:center'>{lk_c}</td>"
+                f"</tr>")
+    _th = ("padding:6px 8px;text-align:left;font-size:0.85em;color:#6b7280;"
+           "border-bottom:2px solid #d1d5db;")
+    st.markdown(
+        "<table style='width:100%;border-collapse:collapse;font-size:0.92em'>"
+        f"<tr><th style='{_th}'>Data</th>"
+        f"<th style='{_th}{_sep}padding-left:12px'>Banco</th>"
+        f"<th style='{_th}text-align:center'>Baixar</th>"
+        f"<th style='{_th}{_sep}padding-left:12px'>Segredos</th>"
+        f"<th style='{_th}text-align:center'>Baixar</th></tr>"
+        + "".join(linhas_html) + "</table>",
+        unsafe_allow_html=True)
 
 
 @st.dialog("✏️ Editar perfil de backup", width="large")
