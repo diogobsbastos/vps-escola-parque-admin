@@ -2275,7 +2275,8 @@ elif pagina == "🐘 Supabase VPS":
     if not db_cred():
         st.warning("Sem ~/.innova_db.json — rode a FASE 1 do banco interno (handoff).")
 
-    tab_bd, tab_bk = st.tabs(["🗄️ Banco de Dados", "💾 Backups"])
+    tab_bd, tab_bk, tab_lg = st.tabs(["🗄️ Banco de Dados", "💾 Backups",
+                                      "🧾 Logs"])
     with tab_bd:
         c_bd1, c_bd2, c_bd3 = st.columns([3.9, 1.4, 1.3],
                                          vertical_alignment="center")
@@ -2593,19 +2594,6 @@ elif pagina == "🐘 Supabase VPS":
                     _salvar_jobs()
                     st.rerun()
 
-        with st.expander("🧾 Log das execuções (timer + manuais)"):
-            _rc_lg, _out_lg = _run(["journalctl", "-u", "vpsbackup", "-n", "60",
-                                    "--no-pager", "-o", "short-iso"], timeout=8)
-            with st.container(height=260):
-                st.code(((_out_lg or "").strip()
-                         or "sem registros ainda — instale/ative o timer "
-                            "vpsbackup (kit no handoff)")[-4000:],
-                        language="text")
-            st.caption("O timer dispara TODA hora (xx:30); cada perfil executa "
-                       "só no horário dele. \"nenhum perfil no horário\" = "
-                       "ronda vazia, normal. Execuções manuais (▶ Agora) não "
-                       "passam pelo timer e aparecem só no 🧾 do card.")
-
         _locais = [Path(str(_j.get("destino", ""))) for _j in _jobs
                    if str(_j.get("destino", "")).startswith("/")]
         _arqs_bk = []
@@ -2625,6 +2613,28 @@ elif pagina == "🐘 Supabase VPS":
         st.caption("Restaurar: `gunzip -c ARQ.sql.gz | sudo -u postgres psql "
                    "-d BANCO` · cada execução também guarda `configs_*.tgz` "
                    "(segredos do servidor).")
+
+    with tab_lg:
+        @st.fragment(run_every=6)
+        def _logs_banco():
+            c_lg1, c_lg2 = st.columns([2.6, 1.6])
+            _fontes = {"💾 Backups (vpsbackup)": "vpsbackup",
+                       "🐘 PostgreSQL": "postgresql",
+                       "🔗 PostgREST (API)": "postgrest"}
+            _f_lg = c_lg1.selectbox("Fonte do log", list(_fontes.keys()),
+                                    key="lg_fonte")
+            _n_lg = c_lg2.slider("Linhas", 20, 300, 80, step=20, key="lg_n")
+            _rc_lg, _out_lg = _run(["journalctl", "-u", _fontes[_f_lg], "-n",
+                                    str(_n_lg), "--no-pager", "-o", "short-iso"],
+                                   timeout=8)
+            with st.container(height=420):
+                st.code(((_out_lg or "").strip()
+                         or "sem registros ainda")[-12000:], language="text")
+            st.caption("🔄 atualiza sozinho a cada 6s · o timer do backup roda "
+                       "toda hora (xx:30) — \"nenhum perfil no horário\" é "
+                       "ronda vazia, normal · execuções manuais (▶ Agora) "
+                       "aparecem no 🧾 do card do perfil.")
+        _logs_banco()
 
 
 # ============================================================
