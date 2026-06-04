@@ -598,6 +598,53 @@ def git_estado() -> dict:
         return {}
 
 
+GIT_HIST_PATH = Path.home() / ".vps_git_historico.json"
+
+
+def git_hist_add(repo: str, commit: str, origem: str) -> None:
+    """Registra um deploy no histórico (mantém os 100 últimos)."""
+    try:
+        hist = json.loads(GIT_HIST_PATH.read_text()) if GIT_HIST_PATH.exists() else []
+    except Exception:
+        hist = []
+    hist.append({"repo": repo, "commit": commit,
+                 "quando": time.strftime("%Y-%m-%d %H:%M"), "origem": origem})
+    try:
+        GIT_HIST_PATH.write_text(json.dumps(hist[-100:], ensure_ascii=False, indent=1))
+    except Exception:
+        pass
+
+
+def git_hist_ler() -> list:
+    try:
+        return json.loads(GIT_HIST_PATH.read_text())
+    except Exception:
+        return []
+
+
+def webhook_ativo() -> bool:
+    """True se o receptor push->deploy (vpswebhook) está no ar."""
+    _, out = _run(["systemctl", "is-active", "vpswebhook.service"], timeout=5)
+    return (out or "").strip() == "active"
+
+
+def webhook_ultimo_push() -> str:
+    """Último PUSH recebido pelo webhook (via journal). '' se nenhum."""
+    rc, out = _run(["journalctl", "-u", "vpswebhook", "-n", "300",
+                    "--no-pager", "-o", "short-iso"], timeout=8)
+    if rc != 0 or not out:
+        return ""
+    for ln in reversed(out.splitlines()):
+        if "PUSH " in ln:
+            try:
+                quando = ln.split()[0][:16].replace("T", " ")
+                resto = ln.split("PUSH ", 1)[1].split(" -> ")[0]
+                return f"`{resto}` · {quando}"
+            except Exception:
+                return ln[-80:]
+    return ""
+
+
 def git_deploy(repo: str, conf: dict) -> tuple[bool, str]:
     """Atualiza producao: modo 'pull' (pasta e clone) ou modo 'mapa' (clona e espalha)."""
     import shutil
@@ -620,6 +667,7 @@ def git_deploy(repo: str, conf: dict) -> tuple[bool, str]:
             GIT_STATE_PATH.write_text(json.dumps(est, indent=2))
         except Exception:
             pass
+        git_hist_add(repo, (h or "?").strip(), "painel (↻)")
         return True, (h or "?").strip()
     mapa = conf.get("mapa", {})
     tmp = f"/tmp/deploy-{repo}"
@@ -653,6 +701,7 @@ def git_deploy(repo: str, conf: dict) -> tuple[bool, str]:
         GIT_STATE_PATH.write_text(json.dumps(est, indent=2))
     except Exception:
         pass
+    git_hist_add(repo, (h or "?").strip(), "painel (↻)")
     return True, (h or "?").strip()
 
 
@@ -1224,24 +1273,41 @@ elif pagina == "🌿 Git & Deploys":
         "Histórico e rollback ficam no GitHub."
     )
 
-    @st.fragment(run_every=2)
-    def _cronometro_vigia():
+    @st.fragment(run_every=3)
+    def _status_deploy():
         seg = autodeploy_proximo()
-        if seg is None:
-            st.caption("🕐 Vigia auto-deploy: timer não instalado no servidor.")
-            return
         if seg == -1:
-            st.markdown("### 🔨 Vigia TRABALHANDO agora")
-            st.progress(1.0, text="deploy em andamento (pull/build/restart) — "
-                                  "a contagem volta quando ele terminar")
+            st.markdown("### 🔨 Deploy em andamento")
+            st.progress(1.0, text="o vigia está aplicando (pull/build/restart) — "
+                                  "esta faixa volta ao normal quando ele terminar")
             return
-        m, s2 = divmod(int(seg), 60)
-        c_cr1, c_cr2 = st.columns([1.6, 4], vertical_alignment="center")
-        c_cr1.markdown(f"### 🕐 `{m:02d}:{s2:02d}`")
-        c_cr2.progress(max(0.0, min(1.0, 1 - seg / 30)),
-                       text="próxima ronda do vigia — projetos com ⚙️ auto ligado "
-                            "são atualizados se houver commit novo no GitHub")
-    _cronometro_vigia()
+        hook_on = webhook_ativo()
+        ultimo = webhook_ultimo_push()
+        with st.container(border=True):
+            c_w, c_u, c_r = st.columns([1.9, 2.7, 1.7], vertical_alignment="center")
+            c_w.markdown(
+                ("⚡ **Webhook** 🟢 ativo  \n<small>push no GitHub → deploy em ~5s</small>")
+                if hook_on else
+                ("⚡ **Webhook** 🔴 fora do ar  \n<small>deploys só pela ronda — "
+                 "conferir serviço `vpswebhook`</small>"),
+                unsafe_allow_html=True,
+            )
+            c_u.markdown(
+                ("📨 **Último push recebido**  \n<small>" + ultimo + "</small>")
+                if ultimo else
+                ("📨 **Último push recebido**  \n<small>nenhum ainda — faça um "
+                 "commit e veja a mágica</small>"),
+                unsafe_allow_html=True,
+            )
+            if seg is None:
+                c_r.markdown("🕐 **Ronda de segurança**  \n<small>timer não "
+                             "instalado</small>", unsafe_allow_html=True)
+            else:
+                m, s2 = divmod(int(seg), 60)
+                c_r.markdown(f"🕐 **Ronda de segurança**  \n<small>próxima em "
+                             f"`{m:02d}:{s2:02d}` · rede de segurança do webhook</small>",
+                             unsafe_allow_html=True)
+    _status_deploy()
 
     estado = git_estado()
     _extras_git = git_projetos_extras()
@@ -1272,9 +1338,9 @@ elif pagina == "🌿 Git & Deploys":
             )
             _auto_atual = bool(conf.get("auto"))
             _auto = c0.toggle("⚙️ auto", value=_auto_atual, key=f"auto_{repo}",
-                              help="Auto-deploy: o servidor confere o GitHub a cada 2 min "
-                                   "e aplica sozinho (push = deploy, sem clicar em nada). "
-                                   "Requer o timer vpsautodeploy instalado.")
+                              help="Auto-deploy: push no GitHub → webhook dispara o vigia "
+                                   "na hora (~5s); a ronda de 2 min cobre qualquer "
+                                   "falha. Desligado = só deploy manual pelo ↻.")
             if _auto != _auto_atual:
                 _ex = git_projetos_extras()
                 _ex[repo] = {**conf, "auto": _auto}
@@ -1341,10 +1407,19 @@ elif pagina == "🌿 Git & Deploys":
                         _extras_git.pop(repo, None)
                         salvar_git_projetos(_extras_git)
                         st.rerun()
+    hist = git_hist_ler()
+    if hist:
+        with st.expander(f"📜 Histórico de deploys ({len(hist)})"):
+            for ev in reversed(hist[-30:]):
+                st.markdown(
+                    f"<small>`{ev.get('quando', '?')}` · **{ev.get('repo', '?')}** · "
+                    f"`{ev.get('commit', '?')}` · {ev.get('origem', '?')}</small>",
+                    unsafe_allow_html=True,
+                )
     st.divider()
     st.caption(
-        "🔜 Próximos a conectar: `escola-parque` e `sertanejo-lab` (entram aqui "
-        "quando os repos receberem o código). O Claude também opera esta ponte via MCP."
+        "⚡ Fluxo da casa: commit → GitHub toca a campainha (webhook) → vigia aplica "
+        "em ~5s. A ronda de 2 min é rede de segurança. O Claude opera esta ponte via MCP."
     )
 
 
