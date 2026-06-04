@@ -2465,7 +2465,8 @@ elif pagina == "🐘 Supabase VPS":
                            ("" if _eh_adm else " · acesso direto 5432")) + "</small>",
                         unsafe_allow_html=True,
                     )
-                    if cb2.button("📂 Abrir", key=f"abrir_{b['banco']}"):
+                    if cb2.button("📂 Abrir", key=f"abrir_{b['banco']}",
+                                  use_container_width=True):
                         st.session_state["bd_aberto"] = b["banco"]
                         st.rerun()
 
