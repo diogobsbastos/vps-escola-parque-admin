@@ -462,6 +462,11 @@ GIT_PROJETOS: dict[str, dict] = {
         # vpsadmin por ULTIMO: reinicia o proprio painel
         "servicos": ["llmgateway", "vpsmcp", "vpsadmin"],
     },
+    "escola-parque": {
+        "rotulo": "🏫 Escola Parque V3 (app + worker)",
+        "pull": "/home/ubuntu/escola-parque",   # pasta E um clone -> git pull direto
+        "servicos": ["escolaparque", "escolaparque-worker"],
+    },
 }
 
 
@@ -480,9 +485,24 @@ def git_estado() -> dict:
         return {}
 
 
-def git_deploy(repo: str, mapa: dict) -> tuple[bool, str]:
-    """Clona o ultimo commit e espalha nas pastas de producao (sem tocar nos .venv)."""
+def git_deploy(repo: str, conf: dict) -> tuple[bool, str]:
+    """Atualiza producao: modo 'pull' (pasta e clone) ou modo 'mapa' (clona e espalha)."""
     import shutil
+    if conf.get("pull"):
+        pasta = conf["pull"]
+        rc, out = _run(["env", "GIT_TERMINAL_PROMPT=0", "git", "-C", pasta,
+                        "pull", "--ff-only"], timeout=180)
+        if rc != 0:
+            return False, "pull falhou: " + out[-300:]
+        _, h = _run(["git", "-C", pasta, "rev-parse", "--short=10", "HEAD"])
+        est = git_estado()
+        est[repo] = {"commit": (h or "?").strip(), "quando": time.strftime("%Y-%m-%d %H:%M")}
+        try:
+            GIT_STATE_PATH.write_text(json.dumps(est, indent=2))
+        except Exception:
+            pass
+        return True, (h or "?").strip()
+    mapa = conf.get("mapa", {})
     tmp = f"/tmp/deploy-{repo}"
     shutil.rmtree(tmp, ignore_errors=True)
     rc, out = _run(["env", "GIT_TERMINAL_PROMPT=0", "git", "clone", "--depth", "1",
@@ -941,6 +961,9 @@ elif pagina == "🌿 Git & Deploys":
             remoto = git_remote_head(repo)
             info = estado.get(repo, {})
             local = info.get("commit", "—")
+            if conf.get("pull"):
+                _, _h = _run(["git", "-C", conf["pull"], "rev-parse", "--short=10", "HEAD"])
+                local = (_h or "").strip() if _h and "fatal" not in _h else "—"
             if remoto == "?":
                 situ = "🟡 GitHub inacessível (credencial?)"
             elif local == "—":
@@ -961,7 +984,7 @@ elif pagina == "🌿 Git & Deploys":
                          use_container_width=True):
                 st.info("⏳ Puxando do GitHub e aplicando... o painel vai PISCAR no fim "
                         "(reinicia a si mesmo). Dê F5 em ~10s.")
-                ok, msg = git_deploy(repo, conf["mapa"])
+                ok, msg = git_deploy(repo, conf)
                 if ok:
                     st.success(f"✅ Commit `{msg}` aplicado. Reiniciando: "
                                + ", ".join(conf["servicos"]))
