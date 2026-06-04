@@ -1350,18 +1350,23 @@ elif pagina == "🌿 Git & Deploys":
                            use_container_width=True)
             if c3.button("↻ Atualizar", key=f"dep_{repo}", type="primary",
                          use_container_width=True):
-                st.info("⏳ Puxando do GitHub e aplicando... o painel vai PISCAR no fim "
-                        "(reinicia a si mesmo). Dê F5 em ~10s.")
-                ok, msg = git_deploy(repo, conf)
-                if ok:
-                    st.success(f"✅ Commit `{msg}` aplicado. Reiniciando: "
-                               + ", ".join(conf["servicos"]))
-                    for s in conf["servicos"]:
-                        acao_servico(s, "restart")
-                        time.sleep(1)
-                    st.rerun()
+                if remoto != "?" and local not in ("—", "") and remoto == local:
+                    st.info("✅ Já está em dia com o GitHub — nada a atualizar. "
+                            "Commit novo entra sozinho (webhook, ~5s). Precisa "
+                            "reaplicar à força? Use ⋯ → ↻ Forçar redeploy.")
                 else:
-                    st.error("Deploy falhou: " + msg)
+                    st.info("⏳ Puxando do GitHub e aplicando... o painel vai PISCAR "
+                            "no fim (reinicia a si mesmo). Dê F5 em ~10s.")
+                    ok, msg = git_deploy(repo, conf)
+                    if ok:
+                        st.success(f"✅ Commit `{msg}` aplicado. Reiniciando: "
+                                   + ", ".join(conf["servicos"]))
+                        for s in conf["servicos"]:
+                            acao_servico(s, "restart")
+                            time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("Deploy falhou: " + msg)
             with cx.popover("⋯", use_container_width=True):
                 st.markdown(f"**⚙️ Configurar `{repo}`**")
                 with st.form(f"edit_{repo}", border=False):
@@ -1399,6 +1404,19 @@ elif pagina == "🌿 Git & Deploys":
                     _ex_ed[repo] = novo_conf
                     salvar_git_projetos(_ex_ed)
                     st.rerun()
+                st.divider()
+                if st.button("↻ Forçar redeploy", key=f"force_{repo}",
+                             use_container_width=True,
+                             help="Reaplica o commit atual do GitHub mesmo já "
+                                  "estando em dia (reinstala arquivos + restart)."):
+                    ok_f, msg_f = git_deploy(repo, conf)
+                    if ok_f:
+                        for s in conf["servicos"]:
+                            acao_servico(s, "restart")
+                            time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("Forçar redeploy falhou: " + msg_f)
                 if repo in _extras_git and repo not in GIT_PROJETOS:
                     st.divider()
                     st.caption("Remover do painel — o app continua rodando; "
