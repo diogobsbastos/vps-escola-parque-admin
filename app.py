@@ -1288,17 +1288,49 @@ elif pagina == "🌿 Git & Deploys":
                     st.rerun()
                 else:
                     st.error("Deploy falhou: " + msg)
-            if repo in _extras_git and repo not in GIT_PROJETOS:
-                with cx.popover("✕", use_container_width=True):
-                    st.markdown(f"**Remover `{repo}` do painel?**")
-                    st.caption(
-                        "Isso SÓ tira o projeto desta lista (e do vigia auto-deploy). "
-                        "NÃO mexe no GitHub, NÃO apaga arquivos e NÃO para o app no "
-                        "servidor — tudo continua rodando. Pra trazer de volta: "
-                        "➕ Conectar repo."
+            with cx.popover("⋯", use_container_width=True):
+                st.markdown(f"**⚙️ Configurar `{repo}`**")
+                with st.form(f"edit_{repo}", border=False):
+                    e_rot = st.text_input("Rótulo", value=conf.get("rotulo", repo))
+                    e_pull = st.text_input(
+                        "Pasta (clone) no servidor",
+                        value=conf.get("pull", ""),
+                        help="Vazio = mantém o modo atual (ex.: mapa do VPS Admin).",
                     )
-                    if st.button("Confirmar remoção", key=f"rmconf_{repo}",
-                                 type="primary", use_container_width=True):
+                    e_build = st.text_input(
+                        "Comando de build (opcional)",
+                        value=conf.get("build", ""),
+                        placeholder="npm install && npm run build",
+                        help="Roda após o pull, antes do restart. Build falhou = "
+                             "nada reinicia (produção segue na versão anterior).",
+                    )
+                    e_svc = st.multiselect(
+                        "Serviços a reiniciar",
+                        list(todos_servicos().keys()),
+                        default=[x for x in conf.get("servicos", [])
+                                 if x in todos_servicos()],
+                    )
+                    sv_ed = st.form_submit_button("💾 Salvar", type="primary",
+                                                  use_container_width=True)
+                if sv_ed:
+                    _ex_ed = git_projetos_extras()
+                    novo_conf = {**conf, "rotulo": e_rot.strip() or repo,
+                                 "servicos": e_svc}
+                    if e_pull.strip():
+                        novo_conf["pull"] = e_pull.strip()
+                    if e_build.strip():
+                        novo_conf["build"] = e_build.strip()
+                    else:
+                        novo_conf.pop("build", None)
+                    _ex_ed[repo] = novo_conf
+                    salvar_git_projetos(_ex_ed)
+                    st.rerun()
+                if repo in _extras_git and repo not in GIT_PROJETOS:
+                    st.divider()
+                    st.caption("Remover do painel — o app continua rodando; "
+                               "não mexe no GitHub nem nos arquivos.")
+                    if st.button("✕ Remover do painel", key=f"rmconf_{repo}",
+                                 use_container_width=True):
                         _extras_git.pop(repo, None)
                         salvar_git_projetos(_extras_git)
                         st.rerun()
