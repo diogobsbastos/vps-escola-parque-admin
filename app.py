@@ -1005,13 +1005,22 @@ def dialog_exportar() -> None:
         dp = Path(d)
         if dp.exists():
             arqs += list(dp.glob("*.sql.gz")) + list(dp.glob("*.tgz"))
-    arqs = sorted(arqs, key=lambda p: p.stat().st_mtime, reverse=True)[:30]
+    arqs = sorted(arqs, key=lambda p: p.stat().st_mtime, reverse=True)[:100]
     if not arqs:
         st.info("Nenhum arquivo local ainda — rode um backup primeiro.")
         return
-    esc = st.selectbox("Arquivo (mais recentes primeiro)",
-                       [str(a) for a in arqs])
-    p_esc = Path(esc)
+    st.caption(f"{len(arqs)} backups guardados no servidor (dentro da retenção "
+               "de cada perfil) — escolha qualquer um, inclusive de dias atrás.")
+    rotulos = []
+    for a in arqs:
+        _mt = time.localtime(a.stat().st_mtime)
+        rotulos.append(f"{time.strftime('%d/%m/%Y %H:%M', _mt)} · "
+                       f"{a.name.rsplit('_', 2)[0]} · "
+                       f"{max(1, a.stat().st_size // 1024)} KB"
+                       + ("  (segredos/configs)" if a.name.endswith(".tgz")
+                          else ""))
+    esc = st.selectbox("Backup disponível", rotulos)
+    p_esc = arqs[rotulos.index(esc)]
     st.download_button(f"⬇ Baixar {p_esc.name}", data=p_esc.read_bytes(),
                        file_name=p_esc.name, mime="application/gzip",
                        use_container_width=True)
