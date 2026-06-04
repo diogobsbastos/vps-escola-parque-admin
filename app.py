@@ -1025,10 +1025,17 @@ def dialog_exportar() -> None:
     pag = (c_pag.number_input("Página", 1, total_pag, 1,
                               label_visibility="collapsed")
            if total_pag > 1 else 1)
-    st.markdown("<style>div[data-testid='stDownloadButton'] button"
+    st.markdown("<style>"
+                "div[data-testid='stDownloadButton'] button"
                 "{width:2.2rem;min-width:2.2rem;height:1.9rem;"
-                "min-height:1.9rem;padding:0;}</style>",
-                unsafe_allow_html=True)
+                "min-height:1.9rem;padding:0;}"
+                "div[data-testid='stDialog'] [data-testid='stMarkdownContainer'] p"
+                "{margin:0;padding:0;line-height:1.2;}"
+                "div[data-testid='stDialog'] [data-testid='stVerticalBlock']"
+                "{gap:0.2rem;}"
+                "div[data-testid='stDialog'] [data-testid='stHorizontalBlock']"
+                "{align-items:center;}"
+                "</style>", unsafe_allow_html=True)
     for k in chaves[(int(pag) - 1) * POR_PAG: int(pag) * POR_PAG]:
         itens = grupos[k]
         dumps = [a for a in itens if a.name.endswith(".sql.gz")]
