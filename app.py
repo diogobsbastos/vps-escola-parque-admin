@@ -1010,20 +1010,19 @@ def dialog_exportar() -> None:
         st.info("Nenhum arquivo local ainda — rode um backup primeiro.")
         return
     st.caption(f"{len(arqs)} backups guardados no servidor (dentro da retenção "
-               "de cada perfil) — escolha qualquer um, inclusive de dias atrás.")
-    rotulos = []
-    for a in arqs:
+               "de cada perfil) — inclusive de dias atrás.")
+    for a in arqs[:25]:
+        _ce1, _ce2 = st.columns([4.3, 1.2], vertical_alignment="center")
         _mt = time.localtime(a.stat().st_mtime)
-        rotulos.append(f"{time.strftime('%d/%m/%Y %H:%M', _mt)} · "
-                       f"{a.name.rsplit('_', 2)[0]} · "
-                       f"{max(1, a.stat().st_size // 1024)} KB"
-                       + ("  (segredos/configs)" if a.name.endswith(".tgz")
-                          else ""))
-    esc = st.selectbox("Backup disponível", rotulos)
-    p_esc = arqs[rotulos.index(esc)]
-    st.download_button(f"⬇ Baixar {p_esc.name}", data=p_esc.read_bytes(),
-                       file_name=p_esc.name, mime="application/gzip",
-                       use_container_width=True)
+        _tipo = "🔐 configs" if a.name.endswith(".tgz") else "🗄️ " + a.name.rsplit("_", 2)[0]
+        _ce1.markdown(f"<small>`{time.strftime('%d/%m/%Y %H:%M', _mt)}` · "
+                      f"{_tipo} · {a.name} · "
+                      f"{max(1, a.stat().st_size // 1024)} KB</small>",
+                      unsafe_allow_html=True)
+        _ce2.download_button("⬇ Baixar", data=a.read_bytes(),
+                             file_name=a.name, mime="application/gzip",
+                             key=f"dl_{a.name}_{int(a.stat().st_mtime)}",
+                             use_container_width=True)
 
 
 @st.dialog("✏️ Editar perfil de backup", width="large")
