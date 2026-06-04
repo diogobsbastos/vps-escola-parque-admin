@@ -1309,6 +1309,10 @@ elif pagina == "🌿 Git & Deploys":
                              unsafe_allow_html=True)
     _status_deploy()
 
+    # popovers ⋯ com largura uniforme (senão cada um abre de um tamanho)
+    st.markdown("<style>div[data-testid='stPopoverBody']"
+                "{min-width:min(480px,92vw);}</style>", unsafe_allow_html=True)
+
     estado = git_estado()
     _extras_git = git_projetos_extras()
     for repo, conf in todos_git_projetos().items():
