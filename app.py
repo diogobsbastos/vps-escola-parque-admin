@@ -67,6 +67,7 @@ SERVICOS_BASE: dict[str, str] = {
     "llmgateway":          "🔑 LLM Gateway (API com chave)",
     "vpsmcp":              "🔌 VPS-MCP (ponte do Claude)",
     "sertanejolab":        "🎸 Sertanejo Lab (app)",
+    "innovafront":         "🚀 Innova Front (Next.js)",
 }
 
 ACOES = ("restart", "stop", "start")
@@ -253,6 +254,41 @@ def rotas_nginx() -> list[str]:
         if s.startswith("location") and "{" in s:
             rotas.append(s.split("{")[0].replace("location", "").strip())
     return rotas
+
+
+def dominios_nginx() -> list[dict]:
+    """Varre /etc/nginx/sites-enabled e extrai: dominio, destino e se tem SSL."""
+    import glob as _g
+    achados: dict[str, dict] = {}
+    for f in sorted(_g.glob("/etc/nginx/sites-enabled/*")):
+        try:
+            txt = Path(f).read_text()
+        except Exception:
+            continue
+        for bloco in txt.split("server {")[1:]:
+            nome, alvo, ssl = "", "", False
+            for ln in bloco.splitlines():
+                ls = ln.strip()
+                if ls.startswith("server_name") and not nome:
+                    nome = ls.replace("server_name", "").strip(" ;")
+                if "listen 443" in ls:
+                    ssl = True
+                if "proxy_pass" in ls and not alvo:
+                    alvo = ls.split("proxy_pass")[1].strip(" ;")
+            if not nome or nome == "_":
+                continue
+            atual = achados.get(nome, {"dominio": nome, "alvo": "", "ssl": False,
+                                       "arquivo": Path(f).name})
+            atual["ssl"] = atual["ssl"] or ssl
+            if alvo and not atual["alvo"]:
+                atual["alvo"] = alvo
+            achados[nome] = atual
+    return list(achados.values())
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def cert_validade_cache(dominio: str) -> str | None:
+    return cert_validade(dominio)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -727,7 +763,7 @@ with st.sidebar:
     PAGINAS = [
         "📊 Dashboard",
         "🚀 Aplicativos",
-        "🌐 Rotas Nginx",
+        "🌐 Domínios & Rotas",
         "🌿 Git & Deploys",
         "🦙 Ollama (IA local)",
         "🔑 API da LLM",
@@ -998,8 +1034,68 @@ sudo nginx -t && sudo systemctl reload nginx""",
 # PAGINA: Rotas Nginx
 # ============================================================
 
-elif pagina == "🌐 Rotas Nginx":
-    st.title("🌐 Rotas Nginx")
+elif pagina == "🌐 Domínios & Rotas":
+    c_tit_d, c_novo_d = st.columns([4.5, 1.6], vertical_alignment="center")
+    with c_tit_d:
+        st.title("🌐 Domínios & Rotas")
+    with c_novo_d:
+        if st.button("➕ Novo domínio", type="primary", use_container_width=True):
+            st.session_state["form_dom"] = not st.session_state.get("form_dom", False)
+
+    if st.session_state.get("form_dom"):
+        with st.container(border=True):
+            st.markdown("**Apontar um domínio novo pra um app deste servidor** "
+                        "(ex.: frontend Next na porta 3000)")
+            with st.form("novo_dominio", border=False):
+                d1, d2, d3 = st.columns([2.2, 1.4, 1], vertical_alignment="bottom")
+                dom_novo = d1.text_input("Domínio completo",
+                                         placeholder="meuapp.duckdns.org")
+                porta_dom = d2.number_input("Porta interna do app", min_value=3000,
+                                            max_value=8999, value=3000)
+                ok_dom = d3.form_submit_button("Gerar kit 🔧", type="primary",
+                                               use_container_width=True)
+            if ok_dom and dom_novo.strip():
+                _d = dom_novo.strip()
+                _slug = _d.split(".")[0]
+                st.markdown("**1️⃣ DNS:** crie o subdomínio no provedor "
+                            f"(DuckDNS: add domain `{_slug}`) apontando pra `{IP_PUBLICO}`.")
+                st.markdown("**2️⃣ SSH (bloco único):**")
+                st.code(f"""sudo tee /etc/nginx/sites-available/{_slug} > /dev/null <<'EOF'
+server {{
+    listen 80;
+    server_name {_d};
+    location / {{
+        proxy_pass http://127.0.0.1:{porta_dom};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 86400;
+    }}
+}}
+EOF
+sudo ln -sf /etc/nginx/sites-available/{_slug} /etc/nginx/sites-enabled/{_slug}
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d {_d} --redirect -m diogobsbastos@gmail.com --agree-tos --no-eff-email""",
+                        language="bash")
+                st.caption("O domínio aparece na lista abaixo sozinho depois de criado.")
+
+    st.subheader("🌍 Domínios deste servidor")
+    for _dm in dominios_nginx():
+        with st.container(border=True):
+            _val_d = cert_validade_cache(_dm["dominio"]) if _dm["ssl"] else None
+            _alvo_txt = _dm["alvo"] or "(rotas internas — veja abaixo)"
+            st.markdown(
+                f"**{'🔒' if _dm['ssl'] else '⚠️ sem SSL'} "
+                f"[{_dm['dominio']}](https://{_dm['dominio']})**  \n"
+                f"→ `{_alvo_txt}` · arquivo `{_dm['arquivo']}`"
+                + (f" · <small><span style='color:#9ca3af'>cert até {_val_d}</span></small>"
+                   if _val_d else ""),
+                unsafe_allow_html=True,
+            )
+
+    st.divider()
+    st.subheader("🛣️ Rotas internas do domínio principal")
     with st.container(border=True):
         c_dom, c_duck = st.columns([4.2, 1.3], vertical_alignment="center")
         c_dom.markdown(
