@@ -33,7 +33,7 @@ PASTAS_OK = [
 SERVICOS_OK = {
     "escolaparque", "escolaparque-worker", "vpsadmin",
     "nginx", "ollama", "llmgateway", "sertanejolab", "vpsmcp",
-    "innovafront",
+    "innovafront", "vpswebhook", "postgresql",
 }
 ACOES_OK = {"restart", "stop", "start", "status"}
 
@@ -158,6 +158,32 @@ def git(comando: str, pasta: str) -> str:
     if sub not in permitidos:
         return f"ERRO: só {permitidos} são permitidos no nível 1."
     return _run(["git", "-C", str(p)] + comando.split(), timeout=120)
+
+
+DB_CRED_PATH = Path.home() / ".innova_db.json"
+
+
+@mcp.tool()
+def sql_local(query: str, banco: str = "innova", como: str = "worker") -> str:
+    """SQL no PostgreSQL LOCAL (banco interno do servidor — nosso 'Supabase caseiro').
+    como: worker (service-role) | app (frontend). Aceita SELECT/INSERT/DDL."""
+    try:
+        cred = json.loads(DB_CRED_PATH.read_text())
+    except Exception:
+        return "ERRO: ~/.innova_db.json não existe (FASE 1 do banco não rodou?)."
+    u = cred.get(como) or cred.get("worker") or {}
+    env = dict(os.environ, PGPASSWORD=u.get("pass", ""))
+    try:
+        r = subprocess.run(
+            ["psql", "-X", "-v", "ON_ERROR_STOP=1", "-P", "pager=off",
+             "-h", cred.get("host", "127.0.0.1"),
+             "-p", str(cred.get("port", 5432)),
+             "-U", u.get("user", ""), "-d", banco, "-c", query],
+            capture_output=True, text=True, timeout=120, env=env)
+        out = (r.stdout + r.stderr).strip()
+        return out[:100000] or "(sem saída)"
+    except Exception as e:  # noqa: BLE001
+        return f"erro: {e}"
 
 
 if __name__ == "__main__":
