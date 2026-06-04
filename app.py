@@ -1464,10 +1464,11 @@ elif pagina == "🌿 Git & Deploys":
                 "{display:flex;justify-content:center;}"
                 "div[data-testid='stPopover'] button"
                 "{justify-content:center;text-align:center;padding:0;"
-                "width:1.9rem;min-width:1.9rem;max-width:1.9rem;"
-                "min-height:1.9rem;height:1.9rem;}"
+                "width:2.1rem;min-width:2.1rem;max-width:2.1rem;"
+                "min-height:2.1rem;height:2.1rem;border-radius:0.5rem;}"
                 "div[data-testid='stPopover'] button p"
-                "{margin:0;line-height:1;}</style>", unsafe_allow_html=True)
+                "{margin:0;line-height:1;font-size:1rem;}</style>",
+                unsafe_allow_html=True)
 
     estado = git_estado()
     _extras_git = git_projetos_extras()
@@ -1513,7 +1514,7 @@ elif pagina == "🌿 Git & Deploys":
                 if remoto != "?" and local not in ("—", "") and remoto == local:
                     st.info("✅ Já está em dia com o GitHub — nada a atualizar. "
                             "Commit novo entra sozinho (webhook, ~5s). Precisa "
-                            "reaplicar à força? Use ⋯ → ↻ Forçar redeploy.")
+                            "reaplicar à força? Use ✏️ → ↻ Forçar redeploy.")
                 else:
                     st.info("⏳ Puxando do GitHub e aplicando... o painel vai PISCAR "
                             "no fim (reinicia a si mesmo). Dê F5 em ~10s.")
@@ -1527,7 +1528,7 @@ elif pagina == "🌿 Git & Deploys":
                         st.rerun()
                     else:
                         st.error("Deploy falhou: " + msg)
-            with cx.popover("⋯"):
+            with cx.popover("✏️"):
                 st.markdown(f"**⚙️ Configurar `{repo}`**")
                 with st.form(f"edit_{repo}", border=False):
                     e_rot = st.text_input("Rótulo", value=conf.get("rotulo", repo))
