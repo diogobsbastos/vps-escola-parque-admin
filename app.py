@@ -1435,8 +1435,12 @@ elif pagina == "🌿 Git & Deploys":
     with c_t:
         st.title("🌿 Git & Deploys")
     with c_add:
-        if st.button("➕ Conectar repo", type="primary", use_container_width=True):
-            st.session_state["form_repo"] = not st.session_state.get("form_repo", False)
+        _form_aberto = bool(st.session_state.get("form_repo"))
+        if st.button("✖ Fechar formulário" if _form_aberto else "➕ Conectar repo",
+                     type="secondary" if _form_aberto else "primary",
+                     use_container_width=True):
+            st.session_state["form_repo"] = not _form_aberto
+            st.rerun()
     with c_gh:
         st.link_button("🐙 GitHub", f"https://github.com/{GIT_USER}?tab=repositories",
                        use_container_width=True)
