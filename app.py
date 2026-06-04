@@ -1097,22 +1097,27 @@ if pagina == "📊 Dashboard":
     _sobras = [s for s in _svcs if s not in _agrupados]
     if _sobras:
         REGIOES.append(("📦 Outros apps", _sobras))
-    for _reg, _lista in REGIOES:
-        _lista = [s for s in _lista if s in _svcs]
-        if not _lista:
-            continue
-        st.markdown(f"##### {_reg}")
-        cols = st.columns(3)
-        for i, nome in enumerate(_lista):
-            stt = status_servico(nome)
-            cor = {"active": "🟢", "inactive": "⚪", "failed": "🔴"}.get(stt, "🟡")
-            with cols[i % 3]:
-                with st.container(border=True):
-                    st.markdown(f"**{cor} {_svcs[nome]}**")
-                    _stk = (stack_node(STACK_SERVICO[nome])
-                            if nome in STACK_SERVICO else "")
-                    st.caption(f"`{nome}` · {stt}"
-                               + (f"  \n{_stk}" if _stk else ""))
+    _CORES_REG = {"🏫": "#dbeafe", "🚀": "#fee2e2", "🎸": "#fef9c3",
+                  "🧰": "#e5e7eb", "📦": "#f3e8ff"}
+    _ordem = [(reg, s) for reg, ss in REGIOES for s in ss if s in _svcs]
+    cols = st.columns(3)
+    for i, (_reg, nome) in enumerate(_ordem):
+        stt = status_servico(nome)
+        cor = {"active": "🟢", "inactive": "⚪", "failed": "🔴"}.get(stt, "🟡")
+        _bg = _CORES_REG.get(_reg[:1], "#e5e7eb")
+        with cols[i % 3]:
+            with st.container(border=True):
+                st.markdown(
+                    f"**{cor} {_svcs[nome]}** "
+                    f"<span style='background:{_bg};border-radius:8px;"
+                    f"padding:1px 8px;font-size:0.68em;white-space:nowrap;"
+                    f"vertical-align:middle'>{_reg}</span>",
+                    unsafe_allow_html=True,
+                )
+                _stk = (stack_node(STACK_SERVICO[nome])
+                        if nome in STACK_SERVICO else "")
+                st.caption(f"`{nome}` · {stt}"
+                           + (f"  \n{_stk}" if _stk else ""))
 
     st.divider()
     st.subheader("🌿 Git & Deploys")
