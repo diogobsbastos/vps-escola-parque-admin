@@ -1100,6 +1100,61 @@ def dialog_exportar() -> None:
         unsafe_allow_html=True)
 
 
+@st.dialog("✏️ Editar canal de alerta", width="large")
+def dialog_editar_canal(canal_id: str) -> None:
+    AL_D = Path.home() / ".vps_alertas.json"
+    try:
+        cfg_d = json.loads(AL_D.read_text())
+    except Exception:
+        cfg_d = {}
+    canais_d = cfg_d.get("canais", [])
+    c = next((x for x in canais_d if x.get("id") == canal_id), None)
+    if not c:
+        st.error("Canal não encontrado.")
+        return
+    tipo = c.get("tipo")
+    novos = dict(c)
+    if tipo == "ntfy":
+        novos["servidor"] = st.text_input("Servidor",
+                                          value=c.get("servidor", "")).strip()
+        novos["topico"] = st.text_input("Tópico",
+                                        value=c.get("topico", "")).strip()
+        novos["usuario"] = st.text_input("Usuário",
+                                         value=c.get("usuario", "")).strip()
+        s_n = st.text_input("Senha (vazio = manter atual)", type="password")
+        if s_n.strip():
+            novos["senha"] = s_n.strip()
+    elif tipo == "whatsapp":
+        novos["servidor"] = st.text_input("Servidor Evolution",
+                                          value=c.get("servidor", "")).strip()
+        novos["instancia"] = st.text_input("Instância",
+                                           value=c.get("instancia",
+                                                       "sentinela")).strip()
+        k_n = st.text_input("API key (vazio = manter atual)", type="password")
+        if k_n.strip():
+            novos["apikey"] = k_n.strip()
+        novos["numero"] = st.text_input("Número destino (55+DDD)",
+                                        value=str(c.get("numero", ""))).strip()
+    elif tipo == "telegram":
+        t_n = st.text_input("Token do bot (vazio = manter)", type="password")
+        if t_n.strip():
+            novos["token"] = t_n.strip()
+        novos["chat"] = st.text_input("Chat ID",
+                                      value=str(c.get("chat", ""))).strip()
+    elif tipo == "email":
+        novos["usuario"] = st.text_input("Gmail (remetente)",
+                                         value=c.get("usuario", "")).strip()
+        s_e = st.text_input("Senha de app (vazio = manter)", type="password")
+        if s_e.strip():
+            novos["senha_app"] = s_e.strip().replace(" ", "")
+        novos["para"] = st.text_input("Enviar para",
+                                      value=c.get("para", "")).strip()
+    if st.button("💾 Salvar canal", type="primary", use_container_width=True):
+        c.update(novos)
+        AL_D.write_text(json.dumps(cfg_d, ensure_ascii=False, indent=1))
+        st.rerun()
+
+
 @st.dialog("✏️ Editar perfil de backup", width="large")
 def dialog_editar_backup(job_id: str) -> None:
     BK_CFG_D = Path.home() / ".vps_backup.json"
@@ -3090,8 +3145,8 @@ elif pagina == "🔔 Alertas":
                         st.rerun()
         for _c in list(_canais):
             with st.container(border=True):
-                cc1, cc2, cc3 = st.columns([4.2, 0.9, 0.5],
-                                           vertical_alignment="center")
+                cc1, cc2, cc4, cc3 = st.columns([3.9, 0.9, 0.5, 0.5],
+                                                vertical_alignment="center")
                 _det_c = {"ntfy": f"tópico `{_c.get('topico', '?')}` em "
                                   f"`{(_c.get('servidor') or 'ntfy.sh').replace('https://', '')}`",
                           "whatsapp": f"instância `{_c.get('instancia', '?')}` → "
@@ -3108,6 +3163,9 @@ elif pagina == "🔔 Alertas":
                     _c["ativo"] = _at_c
                     _salvar_acfg()
                     st.rerun()
+                if cc4.button("✏️", key=f"ced_{_c.get('id')}",
+                              help="Editar este canal."):
+                    dialog_editar_canal(_c.get("id", ""))
                 if cc3.button("✕", key=f"cdel_{_c.get('id')}"):
                     _canais.remove(_c)
                     _salvar_acfg()
