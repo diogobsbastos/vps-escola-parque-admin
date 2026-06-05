@@ -3082,6 +3082,27 @@ elif pagina == "🔔 Alertas":
             st.caption("📲 No app ntfy (iPhone/Android): Subscribe → Use another "
                        f"server → `https://ntfy.{DOMINIO}` + tópico + usuário/senha.")
 
+        st.divider()
+        st.markdown("##### 💬 Evolution (Zap Push)")
+        _evo_on = status_servico("evolution") == "active"
+        st.caption(f"{'🟢' if _evo_on else '🔴'} serviço `evolution` · "
+                   f"Manager: https://zap.{DOMINIO}/manager · instância "
+                   "`sentinela` (chip-robô) · o botão ↗ Acessar dos "
+                   "Aplicativos cai direto no dashboard dela.")
+        try:
+            _evo_key = (Path.home() / ".evolution_api_key").read_text().strip()
+        except Exception:
+            _evo_key = ""
+        if _evo_key:
+            with st.expander("🔑 Chave de API global (login do Manager — "
+                             "mostra segredo)"):
+                st.code(_evo_key, language="text")
+                st.caption("Rotacionar: trocar AUTHENTICATION_API_KEY no "
+                           "~/evolution-api/.env + `restart evolution` + "
+                           "atualizar a chave no canal 💬 (✏️) e relogar o Manager.")
+        else:
+            st.info("Sem ~/.evolution_api_key — rode instalar_zap.sh (handoff).")
+
 
 
     with tab_can:
