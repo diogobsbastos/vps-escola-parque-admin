@@ -2914,7 +2914,88 @@ elif pagina == "🔔 Alertas":
                                   "teste"], timeout=90)
         st.code(_out_t or "(sem saída)", language="text")
 
-    tab_can, tab_reg, tab_dia = st.tabs(["📡 Canais", "⚙️ Regras", "🧾 Diário"])
+    tab_can, tab_reg, tab_push, tab_dia = st.tabs(
+        ["📡 Canais", "⚙️ Regras", "📨 Servidor push", "🧾 Diário"])
+
+    with tab_push:
+        _ntfy_on = status_servico("ntfy") == "active"
+        st.caption(f"Servidor de push de marca própria {'🟢' if _ntfy_on else '🔴 (instalar: bash vps-admin/instalar_ntfy.sh)'} · "
+                   f"`https://ntfy.{DOMINIO}` · usuários e tópicos gerenciados "
+                   "AQUI (sem SSH). Apps do framework publicam com 1 POST.")
+        if _ntfy_on:
+            _rc_u, _out_u = _run(["ntfy", "user", "list"], timeout=10)
+            if _rc_u == 0 and _out_u:
+                st.markdown("##### 👤 Usuários do push")
+                with st.container(height=160):
+                    st.code(_out_u, language="text")
+            c_pu1, c_pu2 = st.columns(2)
+            with c_pu1:
+                with st.form("ntfy_user_add", border=True):
+                    st.markdown("**➕ Criar usuário**")
+                    _nu_n = st.text_input("Nome (ex.: sócio, app-innova)")
+                    _nu_s = st.text_input("Senha", type="password")
+                    _nu_t = st.text_input("Acesso aos tópicos (padrão)",
+                                          value="vps-*",
+                                          help="Curinga * vale: vps-*, escola-*…")
+                    _ok_nu = st.form_submit_button("Criar", type="primary")
+                if _ok_nu:
+                    if not (_nu_n.strip() and _nu_s):
+                        st.error("Nome e senha obrigatórios.")
+                    else:
+                        import os as _os2
+                        _env_n = dict(_os2.environ, NTFY_PASSWORD=_nu_s)
+                        try:
+                            _r_add = subprocess.run(
+                                ["ntfy", "user", "add", _nu_n.strip()],
+                                capture_output=True, text=True,
+                                timeout=15, env=_env_n)
+                            _r_acl = subprocess.run(
+                                ["ntfy", "access", _nu_n.strip(),
+                                 _nu_t.strip() or "vps-*", "rw"],
+                                capture_output=True, text=True, timeout=15)
+                            if _r_add.returncode == 0 and _r_acl.returncode == 0:
+                                st.success(f"✅ `{_nu_n.strip()}` criado com "
+                                           f"acesso rw a `{_nu_t.strip()}`")
+                            else:
+                                st.error((_r_add.stderr + _r_acl.stderr)[-300:])
+                        except Exception as e:  # noqa: BLE001
+                            st.error(f"falha: {e}")
+            with c_pu2:
+                with st.form("ntfy_user_del", border=True):
+                    st.markdown("**✕ Remover usuário**")
+                    _du_n = st.text_input("Nome exato")
+                    _ok_du = st.form_submit_button("Remover")
+                if _ok_du and _du_n.strip():
+                    _rc_d, _out_d = _run(["ntfy", "user", "del",
+                                          _du_n.strip()], timeout=15)
+                    (st.success if _rc_d == 0 else st.error)(
+                        ("removido ✓" if _rc_d == 0 else (_out_d or "?")[-200:]))
+            with st.form("ntfy_test_push", border=True):
+                st.markdown("**💬 Enviar push de teste**")
+                _tp1, _tp2, _tp3 = st.columns([1.4, 1.2, 1.2])
+                _tp_top = _tp1.text_input("Tópico", value="vps-alertas")
+                _tp_usu = _tp2.text_input("Usuário", value="diogo")
+                _tp_sen = _tp3.text_input("Senha", type="password",
+                                          key="tp_sen")
+                _ok_tp = st.form_submit_button("📨 Enviar", type="primary")
+            if _ok_tp:
+                import base64 as _b64x
+                import urllib.request as _ur
+                try:
+                    _req_t = _ur.Request(
+                        "http://127.0.0.1:2586/" + _tp_top.strip(),
+                        data="👋 Teste direto do painel VPS Admin!".encode(),
+                        headers={"Title": "VPS Admin",
+                                 "Authorization": "Basic " + _b64x.b64encode(
+                                     f"{_tp_usu}:{_tp_sen}".encode()).decode()})
+                    _ur.urlopen(_req_t, timeout=10)
+                    st.success("✅ enviado — olha o celular!")
+                except Exception as e:  # noqa: BLE001
+                    st.error(f"falhou: {e}")
+            st.caption("📲 No app ntfy (iPhone/Android): Subscribe → Use another "
+                       f"server → `https://ntfy.{DOMINIO}` + tópico + usuário/senha.")
+
+
 
     with tab_can:
         c_ca1, c_ca2 = st.columns([4.2, 1.5], vertical_alignment="center")
