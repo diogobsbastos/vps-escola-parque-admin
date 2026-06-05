@@ -88,14 +88,36 @@ ROTAS_APPS: dict[str, str] = {
 # Apps em DOMÍNIO PRÓPRIO (serviço -> URL completa)
 URLS_EXTERNAS: dict[str, str] = {
     "innovafront": "https://escolaparque-app.duckdns.org",
-    "evolution": ("https://zap.oracle-vipworks.duckdns.org/manager/instance/"
-                  "3aadcec2-f361-4819-8a7b-2f64fc8fa033/dashboard"),
+    "evolution": "https://zap.oracle-vipworks.duckdns.org/manager",
     "ntfy": "https://ntfy.oracle-vipworks.duckdns.org",
 }
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def evolution_dashboard_url() -> str:
+    """Monta o link do dashboard da instância 'sentinela' descobrindo o id via API."""
+    base = "https://zap.oracle-vipworks.duckdns.org"
+    try:
+        key = (Path.home() / ".evolution_api_key").read_text().strip()
+        rc, out = _run(["curl", "-s", "-m", "8",
+                        base + "/instance/fetchInstances",
+                        "-H", "apikey: " + key], timeout=12)
+        dados = json.loads(out)
+        for it in (dados if isinstance(dados, list) else []):
+            inst = it.get("instance", it)
+            if inst.get("instanceName") == "sentinela" or inst.get("name") == "sentinela":
+                iid = inst.get("instanceId") or inst.get("id") or it.get("id")
+                if iid:
+                    return f"{base}/manager/instance/{iid}/dashboard"
+    except Exception:
+        pass
+    return base + "/manager"
+
+
 def url_acesso(nome: str) -> str:
     """URL de acesso do app (subpasta do domínio-mãe OU domínio próprio)."""
+    if nome == "evolution":
+        return evolution_dashboard_url()
     if nome in URLS_EXTERNAS:
         return URLS_EXTERNAS[nome]
     if nome in ROTAS_APPS:
