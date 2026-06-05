@@ -603,8 +603,12 @@ GIT_PROJETOS: dict[str, dict] = {
         "rotulo": "🛠️ VPS Admin (painel + LLM Gateway + MCP)",
         "mapa": {
             "app.py": "/home/ubuntu/vps-admin/app.py",
+            "sentinela.py": "/home/ubuntu/vps-admin/sentinela.py",
+            "backup_pg.py": "/home/ubuntu/vps-admin/backup_pg.py",
             "infra/webhook.py": "/home/ubuntu/vps-admin/webhook.py",
             "infra/criar_webhooks.sh": "/home/ubuntu/vps-admin/criar_webhooks.sh",
+            "infra/instalar_ntfy.sh": "/home/ubuntu/vps-admin/instalar_ntfy.sh",
+            "infra/instalar_zap.sh": "/home/ubuntu/vps-admin/instalar_zap.sh",
             "requirements.txt": "/home/ubuntu/vps-admin/requirements.txt",
             "autodeploy.py": "/home/ubuntu/vps-admin/autodeploy.py",
             "llm_gateway/": "/home/ubuntu/llm-gateway/",
