@@ -3145,8 +3145,8 @@ elif pagina == "🔔 Alertas":
                         st.rerun()
         for _c in list(_canais):
             with st.container(border=True):
-                cc1, cc2, cc4, cc3 = st.columns([3.9, 0.9, 0.5, 0.5],
-                                                vertical_alignment="center")
+                cc1, cc2, cc5, cc4, cc3 = st.columns(
+                    [3.4, 0.9, 0.5, 0.5, 0.5], vertical_alignment="center")
                 _det_c = {"ntfy": f"tópico `{_c.get('topico', '?')}` em "
                                   f"`{(_c.get('servidor') or 'ntfy.sh').replace('https://', '')}`",
                           "whatsapp": f"instância `{_c.get('instancia', '?')}` → "
@@ -3163,6 +3163,22 @@ elif pagina == "🔔 Alertas":
                     _c["ativo"] = _at_c
                     _salvar_acfg()
                     st.rerun()
+                if cc5.button("⚡", key=f"cping_{_c.get('id')}",
+                              help="Testar SÓ este canal agora."):
+                    import importlib.util as _ilu
+                    _spec = _ilu.spec_from_file_location(
+                        "sentinela", "/home/ubuntu/vps-admin/sentinela.py")
+                    _mod = _ilu.module_from_spec(_spec)
+                    try:
+                        _spec.loader.exec_module(_mod)
+                        _ok_p = _mod.enviar_canal(
+                            _c, "⚡ Ping do canal "
+                            f"{_c.get('nome', _c.get('tipo'))} — testando!")
+                        (st.toast(f"✅ {_c.get('nome')}: enviado!")
+                         if _ok_p else
+                         st.toast(f"❌ {_c.get('nome')}: falhou (credenciais?)"))
+                    except Exception as _e_p:  # noqa: BLE001
+                        st.toast(f"erro: {_e_p}")
                 if cc4.button("✏️", key=f"ced_{_c.get('id')}",
                               help="Editar este canal."):
                     dialog_editar_canal(_c.get("id", ""))
