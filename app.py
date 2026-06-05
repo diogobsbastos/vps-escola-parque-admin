@@ -88,6 +88,8 @@ ROTAS_APPS: dict[str, str] = {
 # Apps em DOMÍNIO PRÓPRIO (serviço -> URL completa)
 URLS_EXTERNAS: dict[str, str] = {
     "innovafront": "https://escolaparque-app.duckdns.org",
+    "evolution": "https://zap.oracle-vipworks.duckdns.org/manager",
+    "ntfy": "https://ntfy.oracle-vipworks.duckdns.org",
 }
 
 
