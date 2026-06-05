@@ -73,6 +73,7 @@ SERVICOS_BASE: dict[str, str] = {
     "postgresql":          "🗄️ PostgreSQL 17 (banco interno)",
     "postgrest":           "🔗 PostgREST (API do banco — /rest/v1)",
     "ntfy":                "📨 ntfy (push de marca própria)",
+    "evolution":           "💬 Evolution API (Zap Push)",
 }
 
 ACOES = ("restart", "stop", "start")
@@ -1537,7 +1538,7 @@ if pagina == "📊 Dashboard":
         ("🎸 Sertanejo", ["sertanejolab"]),
         ("🧰 Infra & IA", ["vpsadmin", "nginx", "ollama", "llmgateway",
                            "vpsmcp", "vpswebhook", "postgresql", "postgrest",
-                           "ntfy"]),
+                           "ntfy", "evolution"]),
     ]
     _agrupados = {s for _, _ss in REGIOES for s in _ss}
     _sobras = [s for s in _svcs if s not in _agrupados]
@@ -3010,6 +3011,7 @@ elif pagina == "🔔 Alertas":
         if st.session_state.get("form_novo_canal"):
             with st.container(border=True):
                 _tipo_c = st.selectbox("Tipo", ["📱 ntfy.sh (push no celular)",
+                                                "💬 WhatsApp (Evolution)",
                                                 "✈️ Telegram (bot)",
                                                 "📧 E-mail (Gmail/SMTP)"])
                 _novo_c = {"ativo": True,
@@ -3036,6 +3038,23 @@ elif pagina == "🔔 Alertas":
                                     "usuario": _usu_n.strip(),
                                     "senha": _sen_n.strip()})
                     _valido = bool(_top_c.strip())
+                elif _tipo_c.startswith("💬"):
+                    st.caption("Usa a Evolution API do framework (instância já "
+                               "conectada com o chip-robô). O alerta chega como "
+                               "mensagem de WhatsApp no número destino.")
+                    _srv_w = st.text_input("Servidor Evolution",
+                                           value=f"https://zap.{DOMINIO}")
+                    _ins_w = st.text_input("Instância", value="sentinela")
+                    _key_w = st.text_input("API key (em ~/.evolution_api_key)",
+                                           type="password")
+                    _num_w = st.text_input("Número DESTINO (com 55+DDD)",
+                                           placeholder="ex.: 5521999999999")
+                    _novo_c.update({"tipo": "whatsapp", "nome": "💬 WhatsApp",
+                                    "servidor": _srv_w.strip(),
+                                    "instancia": _ins_w.strip() or "sentinela",
+                                    "apikey": _key_w.strip(),
+                                    "numero": _num_w.strip()})
+                    _valido = bool(_key_w.strip() and _num_w.strip())
                 elif _tipo_c.startswith("✈️"):
                     st.caption("No Telegram: fale com **@BotFather** → /newbot → "
                                "copie o token. Depois mande um 'oi' pro seu bot "
@@ -3073,6 +3092,8 @@ elif pagina == "🔔 Alertas":
                                            vertical_alignment="center")
                 _det_c = {"ntfy": f"tópico `{_c.get('topico', '?')}` em "
                                   f"`{(_c.get('servidor') or 'ntfy.sh').replace('https://', '')}`",
+                          "whatsapp": f"instância `{_c.get('instancia', '?')}` → "
+                                      f"`{_c.get('numero', '?')}`",
                           "telegram": f"chat `{_c.get('chat', '?')}`",
                           "email": f"`{_c.get('usuario', '?')}` → "
                                    f"`{_c.get('para') or _c.get('usuario', '?')}`"

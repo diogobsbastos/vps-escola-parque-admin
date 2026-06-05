@@ -73,6 +73,17 @@ def enviar_canal(c: dict, msg: str) -> bool:
                 req.add_header("Authorization", "Basic " + tok)
             urllib.request.urlopen(req, timeout=15)
             return True
+        if tipo == "whatsapp":
+            srv = (c.get("servidor") or "").rstrip("/")
+            dados = json.dumps({"number": str(c.get("numero", "")),
+                                "text": msg}).encode()
+            req = urllib.request.Request(
+                f"{srv}/message/sendText/{c.get('instancia', 'sentinela')}",
+                data=dados,
+                headers={"Content-Type": "application/json",
+                         "apikey": c.get("apikey", "")})
+            urllib.request.urlopen(req, timeout=20)
+            return True
         if tipo == "telegram":
             dados = json.dumps({"chat_id": str(c.get("chat", "")),
                                 "text": msg}).encode()
