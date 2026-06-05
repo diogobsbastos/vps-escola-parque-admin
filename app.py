@@ -88,7 +88,8 @@ ROTAS_APPS: dict[str, str] = {
 # Apps em DOMÍNIO PRÓPRIO (serviço -> URL completa)
 URLS_EXTERNAS: dict[str, str] = {
     "innovafront": "https://escolaparque-app.duckdns.org",
-    "evolution": "https://zap.oracle-vipworks.duckdns.org/manager",
+    "evolution": ("https://zap.oracle-vipworks.duckdns.org/manager/instance/"
+                  "3aadcec2-f361-4819-8a7b-2f64fc8fa033/dashboard"),
     "ntfy": "https://ntfy.oracle-vipworks.duckdns.org",
 }
 
@@ -1135,6 +1136,12 @@ def dialog_editar_canal(canal_id: str) -> None:
             novos["apikey"] = k_n.strip()
         novos["numero"] = st.text_input("Número destino (55+DDD)",
                                         value=str(c.get("numero", ""))).strip()
+    elif tipo == "webpush":
+        novos["servidor"] = st.text_input("Servidor do app",
+                                          value=c.get("servidor", "")).strip()
+        s_wp = st.text_input("PUSH_SECRET (vazio = manter)", type="password")
+        if s_wp.strip():
+            novos["segredo"] = s_wp.strip()
     elif tipo == "telegram":
         t_n = st.text_input("Token do bot (vazio = manter)", type="password")
         if t_n.strip():
@@ -3069,6 +3076,7 @@ elif pagina == "🔔 Alertas":
             with st.container(border=True):
                 _tipo_c = st.selectbox("Tipo", ["📱 ntfy.sh (push no celular)",
                                                 "💬 WhatsApp (Evolution)",
+                                                "🌐 Web Push (Innova/navegadores)",
                                                 "✈️ Telegram (bot)",
                                                 "📧 E-mail (Gmail/SMTP)"])
                 _novo_c = {"ativo": True,
@@ -3112,6 +3120,19 @@ elif pagina == "🔔 Alertas":
                                     "apikey": _key_w.strip(),
                                     "numero": _num_w.strip()})
                     _valido = bool(_key_w.strip() and _num_w.strip())
+                elif _tipo_c.startswith("🌐"):
+                    st.caption("Manda o alerta como notificação de NAVEGADOR "
+                               "para todos os dispositivos inscritos no Innova "
+                               "(o card 🔔 das Configurações do app). Requer "
+                               "PUSH_SECRET no .env.local do frontend.")
+                    _srv_wp = st.text_input(
+                        "Servidor do app",
+                        value="https://escolaparque-app.duckdns.org")
+                    _seg_wp = st.text_input("PUSH_SECRET", type="password")
+                    _novo_c.update({"tipo": "webpush", "nome": "🌐 Web Push",
+                                    "servidor": _srv_wp.strip(),
+                                    "segredo": _seg_wp.strip()})
+                    _valido = bool(_seg_wp.strip())
                 elif _tipo_c.startswith("✈️"):
                     st.caption("No Telegram: fale com **@BotFather** → /newbot → "
                                "copie o token. Depois mande um 'oi' pro seu bot "
@@ -3151,6 +3172,8 @@ elif pagina == "🔔 Alertas":
                                   f"`{(_c.get('servidor') or 'ntfy.sh').replace('https://', '')}`",
                           "whatsapp": f"instância `{_c.get('instancia', '?')}` → "
                                       f"`{_c.get('numero', '?')}`",
+                          "webpush": f"navegadores inscritos no "
+                                     f"`{(_c.get('servidor') or '?').replace('https://', '')}`",
                           "telegram": f"chat `{_c.get('chat', '?')}`",
                           "email": f"`{_c.get('usuario', '?')}` → "
                                    f"`{_c.get('para') or _c.get('usuario', '?')}`"

@@ -73,6 +73,16 @@ def enviar_canal(c: dict, msg: str) -> bool:
                 req.add_header("Authorization", "Basic " + tok)
             urllib.request.urlopen(req, timeout=15)
             return True
+        if tipo == "webpush":
+            srv = (c.get("servidor") or "").rstrip("/")
+            dados = json.dumps({"secret": c.get("segredo", ""),
+                                "title": "VPS escola-parque-v3",
+                                "body": msg}).encode()
+            req = urllib.request.Request(
+                srv + "/api/push/send", data=dados,
+                headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=20)
+            return True
         if tipo == "whatsapp":
             srv = (c.get("servidor") or "").rstrip("/")
             dados = json.dumps({"number": str(c.get("numero", "")),
