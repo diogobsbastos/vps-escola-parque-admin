@@ -59,11 +59,18 @@ def enviar_canal(c: dict, msg: str) -> bool:
     tipo = c.get("tipo")
     try:
         if tipo == "ntfy":
+            srv = (c.get("servidor") or "https://ntfy.sh").rstrip("/")
             req = urllib.request.Request(
-                "https://ntfy.sh/" + c.get("topico", ""),
+                srv + "/" + c.get("topico", ""),
                 data=msg.encode(),
                 headers={"Title": "VPS escola-parque-v3",
                          "Priority": "high", "Tags": "rotating_light"})
+            if c.get("usuario"):
+                import base64
+                tok = base64.b64encode(
+                    f"{c.get('usuario')}:{c.get('senha', '')}".encode()
+                ).decode()
+                req.add_header("Authorization", "Basic " + tok)
             urllib.request.urlopen(req, timeout=15)
             return True
         if tipo == "telegram":

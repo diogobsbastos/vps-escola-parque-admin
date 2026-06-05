@@ -72,6 +72,7 @@ SERVICOS_BASE: dict[str, str] = {
     "vpswebhook":          "🪝 Webhook (campainha do deploy)",
     "postgresql":          "🗄️ PostgreSQL 17 (banco interno)",
     "postgrest":           "🔗 PostgREST (API do banco — /rest/v1)",
+    "ntfy":                "📨 ntfy (push de marca própria)",
 }
 
 ACOES = ("restart", "stop", "start")
@@ -1535,7 +1536,8 @@ if pagina == "📊 Dashboard":
         ("🚀 Frontend (Innova Exams)", ["innovafront"]),
         ("🎸 Sertanejo", ["sertanejolab"]),
         ("🧰 Infra & IA", ["vpsadmin", "nginx", "ollama", "llmgateway",
-                           "vpsmcp", "vpswebhook", "postgresql", "postgrest"]),
+                           "vpsmcp", "vpswebhook", "postgresql", "postgrest",
+                           "ntfy"]),
     ]
     _agrupados = {s for _, _ss in REGIOES for s in _ss}
     _sobras = [s for s in _svcs if s not in _agrupados]
@@ -2932,13 +2934,26 @@ elif pagina == "🔔 Alertas":
                 _novo_c = {"ativo": True,
                            "id": f"c{int(time.time())}"}
                 if _tipo_c.startswith("📱"):
-                    st.caption("Instale o app **ntfy** no celular → assine um "
-                               "tópico SECRETO (nome difícil de adivinhar) → "
-                               "escreva o mesmo nome aqui.")
-                    _top_c = st.text_input("Tópico ntfy",
-                                           placeholder="ex.: escola-parque-x9k2w")
+                    st.caption("No app **ntfy** do celular: Subscribe to topic → "
+                               "**Use another server** → cole o servidor abaixo + "
+                               "tópico + usuário/senha. (Servidor vazio = ntfy.sh "
+                               "público, sem senha.)")
+                    _srv_c = st.text_input(
+                        "Servidor ntfy",
+                        value=f"https://ntfy.{DOMINIO}",
+                        help="O NOSSO servidor de push (Pacote 5). Apague pra "
+                             "usar o ntfy.sh público.")
+                    _top_c = st.text_input("Tópico",
+                                           placeholder="ex.: vps-alertas")
+                    _cu1, _cu2 = st.columns(2)
+                    _usu_n = _cu1.text_input("Usuário (se o servidor exigir)")
+                    _sen_n = _cu2.text_input("Senha", type="password",
+                                             key="ntfy_pw")
                     _novo_c.update({"tipo": "ntfy", "nome": "📱 ntfy",
-                                    "topico": _top_c.strip()})
+                                    "servidor": _srv_c.strip(),
+                                    "topico": _top_c.strip(),
+                                    "usuario": _usu_n.strip(),
+                                    "senha": _sen_n.strip()})
                     _valido = bool(_top_c.strip())
                 elif _tipo_c.startswith("✈️"):
                     st.caption("No Telegram: fale com **@BotFather** → /newbot → "
@@ -2975,7 +2990,8 @@ elif pagina == "🔔 Alertas":
             with st.container(border=True):
                 cc1, cc2, cc3 = st.columns([4.2, 0.9, 0.5],
                                            vertical_alignment="center")
-                _det_c = {"ntfy": f"tópico `{_c.get('topico', '?')}`",
+                _det_c = {"ntfy": f"tópico `{_c.get('topico', '?')}` em "
+                                  f"`{(_c.get('servidor') or 'ntfy.sh').replace('https://', '')}`",
                           "telegram": f"chat `{_c.get('chat', '?')}`",
                           "email": f"`{_c.get('usuario', '?')}` → "
                                    f"`{_c.get('para') or _c.get('usuario', '?')}`"
