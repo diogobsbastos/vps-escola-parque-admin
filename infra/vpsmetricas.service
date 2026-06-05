@@ -1,0 +1,7 @@
+[Unit]
+Description=Coletor de metricas do servidor (historico)
+
+[Service]
+Type=oneshot
+User=ubuntu
+ExecStart=/usr/bin/python3 /home/ubuntu/vps-admin/coletor_metricas.py

@@ -93,6 +93,29 @@ URLS_EXTERNAS: dict[str, str] = {
 }
 
 
+@st.cache_data(ttl=55, show_spinner=False)
+def ler_metricas(horas: int) -> list[dict]:
+    """Lê o histórico de métricas das últimas N horas (~/.vps_metricas.csv)."""
+    import time as _t
+    p = Path.home() / ".vps_metricas.csv"
+    if not p.exists():
+        return []
+    corte = _t.time() - horas * 3600
+    linhas = p.read_text().splitlines()[1:]
+    out = []
+    for ln in linhas:
+        try:
+            ts, cpu, ram, disco, load = ln.split(",")
+            if float(ts) >= corte:
+                out.append({"hora": _t.strftime("%d/%m %H:%M",
+                                                _t.localtime(float(ts))),
+                            "CPU %": float(cpu), "RAM %": float(ram),
+                            "Disco %": float(disco), "Load": float(load)})
+        except Exception:
+            continue
+    return out
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def evolution_dashboard_url() -> str:
     """Monta o link do dashboard da instância 'sentinela' descobrindo o id via API."""
@@ -605,6 +628,7 @@ GIT_PROJETOS: dict[str, dict] = {
             "app.py": "/home/ubuntu/vps-admin/app.py",
             "sentinela.py": "/home/ubuntu/vps-admin/sentinela.py",
             "backup_pg.py": "/home/ubuntu/vps-admin/backup_pg.py",
+            "coletor_metricas.py": "/home/ubuntu/vps-admin/coletor_metricas.py",
             "infra/webhook.py": "/home/ubuntu/vps-admin/webhook.py",
             "infra/criar_webhooks.sh": "/home/ubuntu/vps-admin/criar_webhooks.sh",
             "infra/instalar_ntfy.sh": "/home/ubuntu/vps-admin/instalar_ntfy.sh",
@@ -3405,6 +3429,33 @@ elif pagina == "🔌 Acesso MCP (Claude)":
 
 elif pagina == "💾 Servidor & Limites":
     st.title("💾 Servidor & Limites (Always Free)")
+
+    # ---- Histórico de uso (coletor a cada 1 min) ----
+    st.subheader("📈 Histórico de uso")
+    _hist_ok = (Path.home() / ".vps_metricas.csv").exists()
+    if not _hist_ok:
+        st.info("Coletor de métricas ainda não instalado — kit no handoff "
+                "(timer vpsmetricas). Os gráficos aparecem após a 1ª coleta.")
+    else:
+        _jan = st.radio("Janela", ["6h", "24h", "7 dias"], horizontal=True,
+                        index=1, key="met_jan")
+        _horas = {"6h": 6, "24h": 24, "7 dias": 168}[_jan]
+        _dados_m = ler_metricas(_horas)
+        if not _dados_m:
+            st.caption("Sem dados nessa janela ainda — aguarde o coletor.")
+        else:
+            import pandas as _pd
+            _df = _pd.DataFrame(_dados_m).set_index("hora")
+            c_g1, c_g2 = st.columns(2)
+            c_g1.markdown("**CPU & RAM (%)**")
+            c_g1.line_chart(_df[["CPU %", "RAM %"]], height=220)
+            c_g2.markdown("**Disco (%) & Load**")
+            c_g2.line_chart(_df[["Disco %", "Load"]], height=220)
+            _u = _dados_m[-1]
+            st.caption(f"🔎 {len(_dados_m)} pontos · agora: CPU {_u['CPU %']:.0f}% "
+                       f"· RAM {_u['RAM %']:.0f}% · Disco {_u['Disco %']:.0f}% "
+                       f"· Load {_u['Load']:.2f} · coleta a cada 1 min")
+    st.divider()
 
     # ---- Identidade do Servidor (fonte única de verdade — estilo WordPress "Site URL") ----
     st.subheader("🌍 Identidade do Servidor")
