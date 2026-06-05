@@ -3165,20 +3165,17 @@ elif pagina == "🔔 Alertas":
                     st.rerun()
                 if cc5.button("⚡", key=f"cping_{_c.get('id')}",
                               help="Testar SÓ este canal agora."):
-                    import importlib.util as _ilu
-                    _spec = _ilu.spec_from_file_location(
-                        "sentinela", "/home/ubuntu/vps-admin/sentinela.py")
-                    _mod = _ilu.module_from_spec(_spec)
-                    try:
-                        _spec.loader.exec_module(_mod)
-                        _ok_p = _mod.enviar_canal(
-                            _c, "⚡ Ping do canal "
-                            f"{_c.get('nome', _c.get('tipo'))} — testando!")
-                        (st.toast(f"✅ {_c.get('nome')}: enviado!")
-                         if _ok_p else
-                         st.toast(f"❌ {_c.get('nome')}: falhou (credenciais?)"))
-                    except Exception as _e_p:  # noqa: BLE001
-                        st.toast(f"erro: {_e_p}")
+                    import json as _jp
+                    _msg_p = ("Ping do canal "
+                              + str(_c.get("nome", _c.get("tipo")))
+                              + " - testando!")
+                    _rc_p, _out_p = _run(
+                        ["python3",
+                         "/home/ubuntu/vps-admin/sentinela.py",
+                         "ping1", _jp.dumps(_c), _msg_p], timeout=40)
+                    _txt_p = (_out_p or "").strip().splitlines()
+                    _res_p = _txt_p[-1] if _txt_p else "(sem saída)"
+                    st.toast(f"{_c.get('nome')}: {_res_p}")
                 if cc4.button("✏️", key=f"ced_{_c.get('id')}",
                               help="Editar este canal."):
                     dialog_editar_canal(_c.get("id", ""))

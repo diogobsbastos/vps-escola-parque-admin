@@ -264,7 +264,15 @@ def main() -> None:
 
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) > 1 and sys.argv[1] == "teste":
+    if len(sys.argv) > 2 and sys.argv[1] == "ping1":
+        try:
+            _canal = json.loads(sys.argv[2])
+            _ok1 = enviar_canal(_canal, sys.argv[3] if len(sys.argv) > 3
+                                else "Ping de teste")
+            print("✅ enviado" if _ok1 else "❌ falhou (credenciais?)")
+        except Exception as _e1:  # noqa: BLE001
+            print(f"❌ erro: {_e1}")
+    elif len(sys.argv) > 1 and sys.argv[1] == "teste":
         cfg_t = {**PADRAO, **carregar(CFG, {})}
         canais = [c for c in cfg_t.get("canais", []) if c.get("ativo", True)]
         if not canais:
