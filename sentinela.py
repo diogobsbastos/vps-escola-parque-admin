@@ -4,11 +4,10 @@ VPS SENTINELA — monitora, avisa (multi-canal) e se cura 🔔
 ===========================================================
 Timer a cada 2 min (vpssentinela). Checa: serviços caídos (auto-restart),
 heartbeat do worker (restart), disco, certificado, backup atrasado, deploy ❌.
-Canais de alerta (página 🔔 do painel, ~/.vps_alertas.json):
-  ntfy.sh (push celular) · Telegram (bot) · E-mail (SMTP/Gmail senha de app)
-Cada alerta sai por TODOS os canais ligados. Anti-spam: avisa na transição,
-re-avisa a cada 6h. Diário: ~/.vps_alertas_log.jsonl.
-Teste manual: sentinela.py teste
+Canais (página 🔔): ntfy (próprio/oficial) · 🌐 Web Push (Innova) ·
+💬 WhatsApp (Evolution) · ✈️ Telegram · 📧 E-mail.
+Anti-spam 6h + aviso de resolvido. Diário: ~/.vps_alertas_log.jsonl.
+Teste: sentinela.py teste  ·  1 canal: sentinela.py ping1 '<json>' 'msg'
 """
 import json
 import shutil

@@ -1534,7 +1534,7 @@ with st.sidebar:
         _cpu = psutil.cpu_percent(interval=0.2)
         _mem = psutil.virtual_memory().percent
         st.markdown(
-            f"<div style='background:#e6f4ec;border-radius:8px;padding:8px 12px;font-size:0.85em;'>"
+            f"<div style='background:#e6f4ec;color:#0f6e56;border-radius:8px;padding:8px 12px;font-size:0.85em;'>"
             f"🟢 <b>{ativos}/{len(svcs)}</b> serviços ativos<br>"
             f"⚙️ CPU {_cpu:.0f}% &nbsp;·&nbsp; 🧠 RAM {_mem:.0f}%</div>",
             unsafe_allow_html=True,
@@ -1542,7 +1542,7 @@ with st.sidebar:
     # Status do MCP — a ponte do Claude com o servidor (sempre visível)
     _mcp_on = mcp_online()
     st.markdown(
-        f"<div style='background:{'#e6f4ec' if _mcp_on else '#fbeae7'};border-radius:8px;"
+        f"<div style='background:{'#e6f4ec' if _mcp_on else '#fbeae7'};color:{'#0f6e56' if _mcp_on else '#993c1d'};border-radius:8px;"
         f"padding:8px 12px;font-size:0.85em;margin-top:6px;'>"
         f"{'🟢 <b>MCP Online</b>' if _mcp_on else '🔴 <b>MCP Offline</b>'} "
         f"<span style='opacity:.7'>· conexão do Claude</span></div>",
@@ -1711,6 +1711,7 @@ elif pagina == "🚀 Aplicativos":
         if st.button("➕ Novo App", type="primary", use_container_width=True):
             st.session_state["pagina"] = "➕ Novo App"
             st.rerun()
+    st.markdown(ABAS_CSS, unsafe_allow_html=True)
     tab_apps, tab_libs = st.tabs(["🚀 Apps & Serviços", "📚 Bibliotecas"])
 
     with tab_apps:

@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """
-VPS BACKUP v3 — multi-perfis (a a "rotina de backups" do framework)
+VPS BACKUP v3 — multi-perfis (a "rotina de backups" do framework)
 ====================================================================
 Perfis em ~/.vps_backup.json (editados pela página 🐘 do painel):
-  {"jobs": [{"id","nome","ativo","hora","dias":[1-7],"destino","manter_dias"}]}
+  {"jobs": [{"id","nome","ativo","horario":"HH:MM","dias":[1-7],"bancos":[],
+             "destino","manter_dias"}]}
+bancos: lista de bancos do perfil — VAZIA = todos (inclusive futuros).
 destino: pasta local ("/home/ubuntu/backups_pg") OU remote rclone ("gdrive:Pasta").
-Timer roda TODA HORA (:30); cada perfil decide se é a vez dele.
+Timer roda A CADA MINUTO; cada perfil age exatamente no seu HH:MM.
 Manual: backup_pg.py force [id_do_perfil]
-Estado por perfil em ~/.vps_backup_estado.json. Restaurar:
-  gunzip -c ARQ.sql.gz | sudo -u postgres psql -d BANCO
+Diário de execuções em ~/.vps_backup_log.jsonl (aba 🧾 Logs do painel).
+Restaurar: gunzip -c ARQ.sql.gz | sudo -u postgres psql -d BANCO
 """
 import gzip
 import json
@@ -36,6 +38,8 @@ def log_evento(job_nome: str, resultado: str, modo: str) -> None:
         {"quando": time.strftime("%Y-%m-%d %H:%M"), "job": job_nome,
          "resultado": resultado, "modo": modo}, ensure_ascii=False))
     LOGF.write_text("\n".join(linhas) + "\n")
+
+
 SEGREDOS = [".innova_db.json", ".postgrest_jwt_secret", "postgrest.conf",
             ".vps_webhook_secret", ".vps_webhook_rota", ".vps_config.json",
             ".vps_git_projetos.json", ".vps_git_state.json",

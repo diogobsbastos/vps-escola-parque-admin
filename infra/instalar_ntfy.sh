@@ -69,4 +69,8 @@ sudo certbot --nginx -d ntfy.oracle-vipworks.duckdns.org --redirect
 echo ""
 echo "== [6] TESTE — digite a senha que voce criou no passo 4 =="
 read -s -p "Senha do usuario diogo: " NTFY_PASS; echo
-curl -s -u "diogo:$NTFY_PASS" -d "Primeiro push do MEU servidor!" https://ntfy.oracle-vipworks.duckdns.org/vps-alertas && echo "" && echo "push enviado!"
+curl -s -u "diogo:$NTFY_PASS" -d "🎉 Primeiro push do MEU servidor de notificações!" https://ntfy.oracle-vipworks.duckdns.org/vps-alertas && echo "" && echo "✅ push enviado!"
+echo ""
+echo "== PRONTO! No iPhone (app ntfy): Use another server ->"
+echo "   servidor: https://ntfy.oracle-vipworks.duckdns.org"
+echo "   topico:   vps-alertas   · usuario: diogo + sua senha"

@@ -1,13 +1,26 @@
 #!/bin/bash
-# CRIAR_WEBHOOKS — liga a campainha push->deploy nos repos via API do GitHub.
-# Idempotente. Requer: ~/.github_token (permissao Webhooks R/W),
-# ~/.vps_webhook_rota, ~/.vps_webhook_secret. Uso: bash criar_webhooks.sh
+# ============================================================
+# CRIAR_WEBHOOKS — liga a campainha push->deploy nos repos
+# ============================================================
+# Cria o webhook (URL secreta + HMAC) em cada repo via API do
+# GitHub. Idempotente: se ja existe, so avisa. Reutilizavel no
+# proximo VPS (basta os 3 arquivos de config abaixo existirem).
+#
+# Requisitos no servidor:
+#   ~/.github_token        (token com permissao Webhooks R/W)
+#   ~/.vps_webhook_rota    (ex.: hook-xxxx)
+#   ~/.vps_webhook_secret  (segredo HMAC)
+#
+# Uso: bash ~/vps-admin/criar_webhooks.sh
+# ============================================================
 set -e
 USUARIO="diogobsbastos"
 REPOS=(escola-parque vps-escola-parque-admin sertanejo-lab escola-parque-frontend)
+
 TOKEN=$(cat ~/.github_token)
 HOOKURL="https://oracle-vipworks.duckdns.org/$(cat ~/.vps_webhook_rota)/"
 SECRET=$(cat ~/.vps_webhook_secret)
+
 for repo in "${REPOS[@]}"; do
   printf "%-30s " "$repo:"
   resp=$(curl -s -X POST \
@@ -20,9 +33,11 @@ import sys, json
 d = json.load(sys.stdin)
 if d.get('id'):
     print('OK - webhook criado (id %s)' % d['id'])
-elif 'Hook already exists' in str(d):
+elif 'already exists' in str(d.get('errors', '')) or 'Hook already exists' in str(d):
     print('ja existia - ok')
 else:
     print('ERRO: %s' % d.get('message', d))
 "
 done
+echo
+echo "Conferir entregas: GitHub > repo > Settings > Webhooks > Recent Deliveries"
